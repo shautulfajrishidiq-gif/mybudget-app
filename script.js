@@ -1,8 +1,9 @@
-// GANTI DENGAN URL WEB APP ANDA
-const API_URL = "https://script.google.com/macros/s/AKfycbx4X9r_8O-aV7neMaqzuBQsPAF_ciSvqpoq3zfq3ueWc-8Pz6UzfiSDJVuoQGqpk2rzeg/exec";
+// GANTI DENGAN URL WEB APP ANDA (deploy ulang setelah update Code.gs)
+const API_URL = "https://script.google.com/macros/s/AKfycby58S2FMAJvh2tbl3Emu5eK1-a1iWTjxLJGvbTQ0eaoq9YaG-NHqkAeoXpetIxnk7gx/exec";
 
 let dataTransaksi = [];
-let chartInstance = null; // Variabel global untuk menampung grafik
+let daftarKategori = { Income: [], Expenses: [], Savings: [] };
+let chartInstance = null;
 
 const formatRupiah = (angka) => {
     return new Intl.NumberFormat('id-ID', {
@@ -13,21 +14,28 @@ const formatRupiah = (angka) => {
 };
 
 // ==========================================
-// 1. READ: AMBIL DATA
+// 1. READ: AMBIL DATA + KATEGORI
 // ==========================================
 async function loadData() {
     const tbody = document.getElementById('tabelBody');
     tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Mengambil data...</td></tr>';
-    
+
     try {
         const response = await fetch(API_URL);
         const result = await response.json();
-        
+
         if (result.status === "success") {
-            dataTransaksi = result.data; 
-            renderTabel(dataTransaksi); // Panggil render tabel
-            updateDashboard(); // Perbarui kartu ringkasan
-            renderChart(); // Render grafik
+            dataTransaksi = result.data;
+
+            // Simpan daftar kategori dari Setup (key: Income/Expenses/Savings)
+            if (result.kategori) {
+                daftarKategori = result.kategori;
+            }
+
+            populateKategoriDropdown(document.getElementById('inputJenis').value);
+            renderTabel(dataTransaksi);
+            updateDashboard();
+            renderChart();
         } else {
             alert("Gagal memuat data: " + result.message);
         }
@@ -38,23 +46,54 @@ async function loadData() {
 }
 
 // ==========================================
+// 1b. ISI DROPDOWN KATEGORI SESUAI JENIS
+// ==========================================
+function populateKategoriDropdown(jenis, kategoriTerpilih) {
+    const select = document.getElementById('inputKategori');
+    const list = daftarKategori[jenis] || [];
+
+    select.innerHTML = '<option value="">-- Pilih Kategori --</option>';
+    list.forEach(kat => {
+        const opt = document.createElement('option');
+        opt.value = kat;
+        opt.textContent = kat;
+        select.appendChild(opt);
+    });
+
+    if (kategoriTerpilih) {
+        select.value = kategoriTerpilih;
+    }
+}
+
+document.getElementById('inputJenis').addEventListener('change', function () {
+    populateKategoriDropdown(this.value);
+});
+
+// ==========================================
 // 2. RENDER TABEL DENGAN PARAMETER DATA
 // ==========================================
 function renderTabel(data) {
     const tbody = document.getElementById('tabelBody');
-    tbody.innerHTML = ''; 
-    
+    tbody.innerHTML = '';
+
     if (data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-gray-500">Tidak ada data yang cocok.</td></tr>';
         return;
     }
-    
+
     const reversedData = [...data].reverse();
-    
+
     reversedData.forEach(item => {
-        const warnaNominal = item.Jenis === 'Pemasukan' ? 'text-green-600' : 'text-red-600';
-        const operator = item.Jenis === 'Pemasukan' ? '+' : '-';
-        
+        let warnaNominal = 'text-red-600';
+        let operator = '-';
+        if (item.Jenis === 'Income') {
+            warnaNominal = 'text-green-600';
+            operator = '+';
+        } else if (item.Jenis === 'Savings') {
+            warnaNominal = 'text-yellow-600';
+            operator = '+';
+        }
+
         const tr = document.createElement('tr');
         tr.className = "border-b hover:bg-gray-50 transition";
         tr.innerHTML = `
@@ -77,20 +116,24 @@ function renderTabel(data) {
 function updateDashboard() {
     let totalPemasukan = 0;
     let totalPengeluaran = 0;
-    
+    let totalTabungan = 0;
+
     dataTransaksi.forEach(item => {
-        if (item.Jenis === 'Pemasukan') {
+        if (item.Jenis === 'Income') {
             totalPemasukan += Number(item.Nominal);
-        } else if (item.Jenis === 'Pengeluaran') {
+        } else if (item.Jenis === 'Expenses') {
             totalPengeluaran += Number(item.Nominal);
+        } else if (item.Jenis === 'Savings') {
+            totalTabungan += Number(item.Nominal);
         }
     });
-    
-    const totalSaldo = totalPemasukan - totalPengeluaran;
-    
+
+    const totalSaldo = totalPemasukan - totalPengeluaran - totalTabungan;
+
     document.getElementById('totalSaldo').innerText = formatRupiah(totalSaldo);
     document.getElementById('totalPemasukan').innerText = formatRupiah(totalPemasukan);
     document.getElementById('totalPengeluaran').innerText = formatRupiah(totalPengeluaran);
+    document.getElementById('totalTabungan').innerText = formatRupiah(totalTabungan);
 }
 
 // ==========================================
@@ -98,11 +141,9 @@ function updateDashboard() {
 // ==========================================
 function renderChart() {
     const ctx = document.getElementById('chartPengeluaran').getContext('2d');
-    
-    // Saring hanya data pengeluaran
-    const pengeluaran = dataTransaksi.filter(item => item.Jenis === 'Pengeluaran');
-    
-    // Kelompokkan total nominal berdasarkan kategori
+
+    const pengeluaran = dataTransaksi.filter(item => item.Jenis === 'Expenses');
+
     const kategoriMap = {};
     pengeluaran.forEach(item => {
         if (kategoriMap[item.Kategori]) {
@@ -115,7 +156,6 @@ function renderChart() {
     const labels = Object.keys(kategoriMap);
     const data = Object.values(kategoriMap);
 
-    // Hancurkan chart lama agar tidak tumpang tindih saat data diperbarui
     if (chartInstance) {
         chartInstance.destroy();
     }
@@ -128,7 +168,7 @@ function renderChart() {
                 data: data.length > 0 ? data : [1],
                 backgroundColor: data.length > 0 ? [
                     '#ef4444', '#f97316', '#f59e0b', '#84cc16', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef'
-                ] : ['#e5e7eb'], // Warna abu-abu jika kosong
+                ] : ['#e5e7eb'],
                 borderWidth: 0
             }]
         },
@@ -149,57 +189,53 @@ function terapkanFilter() {
     const jenis = document.getElementById('filterJenis').value;
 
     const filteredData = dataTransaksi.filter(item => {
-        // Cek apakah deskripsi atau kategori mengandung kata kunci pencarian
         const matchKeyword = item.Deskripsi.toLowerCase().includes(keyword) || item.Kategori.toLowerCase().includes(keyword);
-        // Cek apakah dropdown jenis sesuai (kosong = semua)
         const matchJenis = jenis === "" || item.Jenis === jenis;
-        
         return matchKeyword && matchJenis;
     });
 
     renderTabel(filteredData);
 }
 
-// Tambahkan event listener saat user mengetik atau memilih dropdown
 document.getElementById('searchKeyword').addEventListener('input', terapkanFilter);
 document.getElementById('filterJenis').addEventListener('change', terapkanFilter);
 
 // ==========================================
 // 6. CREATE / UPDATE TRANSAKSI
 // ==========================================
-document.getElementById('formTransaksi').addEventListener('submit', async function(e) {
-    e.preventDefault(); 
-    
+document.getElementById('formTransaksi').addEventListener('submit', async function (e) {
+    e.preventDefault();
+
     const btnSubmit = document.getElementById('btnSubmit');
     const teksAsli = btnSubmit.innerHTML;
     btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Menyimpan...';
     btnSubmit.disabled = true;
-    
+
     const idTransaksi = document.getElementById('inputId').value;
     const actionType = idTransaksi ? 'update' : 'insert';
-    
+
     const payload = {
         action: actionType,
-        id: idTransaksi, 
+        id: idTransaksi,
         tanggal: document.getElementById('inputTanggal').value,
         jenis: document.getElementById('inputJenis').value,
         kategori: document.getElementById('inputKategori').value,
         nominal: document.getElementById('inputNominal').value,
         deskripsi: document.getElementById('inputDeskripsi').value
     };
-    
+
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify(payload)
         });
-        
+
         const result = await response.json();
-        
+
         if (result.status === "success") {
-            resetForm(); 
-            await loadData(); // Reload data memicu update tabel, card, dan chart
+            resetForm();
+            await loadData();
         } else {
             alert("Gagal menyimpan: " + result.message);
         }
@@ -218,32 +254,33 @@ document.getElementById('formTransaksi').addEventListener('submit', async functi
 function siapkanEdit(id) {
     const transaksi = dataTransaksi.find(item => item.ID === id);
     if (!transaksi) return;
-    
+
     document.getElementById('inputId').value = transaksi.ID;
-    
+
     let tanggalForm = transaksi.Tanggal;
     if (tanggalForm.includes('T')) {
         tanggalForm = tanggalForm.split('T')[0];
     }
-    
+
     document.getElementById('inputTanggal').value = tanggalForm;
     document.getElementById('inputJenis').value = transaksi.Jenis;
-    document.getElementById('inputKategori').value = transaksi.Kategori;
+    populateKategoriDropdown(transaksi.Jenis, transaksi.Kategori);
     document.getElementById('inputNominal').value = transaksi.Nominal;
     document.getElementById('inputDeskripsi').value = transaksi.Deskripsi;
-    
+
     const btnSubmit = document.getElementById('btnSubmit');
     btnSubmit.innerHTML = '<i class="fa-solid fa-pen mr-2"></i>Update Transaksi';
     btnSubmit.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-    btnSubmit.classList.add('bg-yellow-500', 'hover:bg-yellow-600'); 
-    
+    btnSubmit.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+
     document.getElementById('formTransaksi').scrollIntoView({ behavior: 'smooth' });
 }
 
 function resetForm() {
     document.getElementById('formTransaksi').reset();
     document.getElementById('inputId').value = '';
-    
+    populateKategoriDropdown(document.getElementById('inputJenis').value);
+
     const btnSubmit = document.getElementById('btnSubmit');
     btnSubmit.innerHTML = 'Simpan Transaksi';
     btnSubmit.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
@@ -253,28 +290,28 @@ function resetForm() {
 async function hapusTransaksi(id) {
     const konfirmasi = confirm("Apakah Anda yakin ingin menghapus transaksi ini?");
     if (!konfirmasi) return;
-    
+
     document.getElementById('tabelBody').innerHTML = '<tr><td colspan="5" class="text-center p-4 text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Menghapus data...</td></tr>';
-    
+
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'delete', id: id })
         });
-        
+
         const result = await response.json();
-        
+
         if (result.status === "success") {
-            await loadData(); 
+            await loadData();
         } else {
             alert("Gagal menghapus: " + result.message);
-            renderTabel(dataTransaksi); 
+            renderTabel(dataTransaksi);
         }
     } catch (error) {
         console.error("Error:", error);
         alert("Terjadi kesalahan koneksi saat menghapus data.");
-        renderTabel(dataTransaksi); 
+        renderTabel(dataTransaksi);
     }
 }
 
