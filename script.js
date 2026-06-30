@@ -33,6 +33,7 @@ async function loadData() {
             }
 
             populateKategoriDropdown(document.getElementById('inputJenis').value);
+            warnaiSelectJenis(document.getElementById('inputJenis').value);
             renderTabel(dataTransaksi);
             updateDashboard();
             renderChart();
@@ -67,7 +68,42 @@ function populateKategoriDropdown(jenis, kategoriTerpilih) {
 
 document.getElementById('inputJenis').addEventListener('change', function () {
     populateKategoriDropdown(this.value);
+    warnaiSelectJenis(this.value);
 });
+
+// ==========================================
+// WARNA SELECT JENIS SESUAI TIPE
+// ==========================================
+function warnaiSelectJenis(jenis) {
+    const select = document.getElementById('inputJenis');
+    select.classList.remove(
+        'text-green-700', 'border-green-500', 'bg-green-50',
+        'text-red-700', 'border-red-500', 'bg-red-50',
+        'text-yellow-700', 'border-yellow-500', 'bg-yellow-50'
+    );
+    if (jenis === 'Income') {
+        select.classList.add('text-green-700', 'border-green-500', 'bg-green-50');
+    } else if (jenis === 'Expenses') {
+        select.classList.add('text-red-700', 'border-red-500', 'bg-red-50');
+    } else if (jenis === 'Savings') {
+        select.classList.add('text-yellow-700', 'border-yellow-500', 'bg-yellow-50');
+    }
+}
+
+// ==========================================
+// FORMAT INPUT NOMINAL JADI Rp 5.000.000
+// ==========================================
+const inputNominal = document.getElementById('inputNominal');
+inputNominal.type = 'text'; // ubah dari number ke text agar bisa pakai titik pemisah
+inputNominal.addEventListener('input', function () {
+    let angka = this.value.replace(/\D/g, ''); // ambil hanya digit
+    this.dataset.raw = angka; // simpan nilai mentah utk dikirim ke server
+    this.value = angka ? new Intl.NumberFormat('id-ID').format(angka) : '';
+});
+
+function getNominalRaw() {
+    return inputNominal.dataset.raw || inputNominal.value.replace(/\D/g, '');
+}
 
 // ==========================================
 // 2. RENDER TABEL DENGAN PARAMETER DATA
@@ -220,7 +256,7 @@ document.getElementById('formTransaksi').addEventListener('submit', async functi
         tanggal: document.getElementById('inputTanggal').value,
         jenis: document.getElementById('inputJenis').value,
         kategori: document.getElementById('inputKategori').value,
-        nominal: document.getElementById('inputNominal').value,
+        nominal: getNominalRaw(),
         deskripsi: document.getElementById('inputDeskripsi').value
     };
 
@@ -265,7 +301,9 @@ function siapkanEdit(id) {
     document.getElementById('inputTanggal').value = tanggalForm;
     document.getElementById('inputJenis').value = transaksi.Jenis;
     populateKategoriDropdown(transaksi.Jenis, transaksi.Kategori);
-    document.getElementById('inputNominal').value = transaksi.Nominal;
+    warnaiSelectJenis(transaksi.Jenis);
+    inputNominal.value = new Intl.NumberFormat('id-ID').format(transaksi.Nominal);
+    inputNominal.dataset.raw = transaksi.Nominal;
     document.getElementById('inputDeskripsi').value = transaksi.Deskripsi;
 
     const btnSubmit = document.getElementById('btnSubmit');
@@ -279,7 +317,9 @@ function siapkanEdit(id) {
 function resetForm() {
     document.getElementById('formTransaksi').reset();
     document.getElementById('inputId').value = '';
+    inputNominal.dataset.raw = '';
     populateKategoriDropdown(document.getElementById('inputJenis').value);
+    warnaiSelectJenis(document.getElementById('inputJenis').value);
 
     const btnSubmit = document.getElementById('btnSubmit');
     btnSubmit.innerHTML = 'Simpan Transaksi';
