@@ -188,22 +188,40 @@
                 <div id="breakdown-savings"></div>
             </div>
 
-            <!-- Charts 2x2 -->
-            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px">
-                <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0">
-                    <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em">Top Income</p>
+            <!-- TOP INCOME -->
+            <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0; margin-bottom:12px">
+                <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:6px">
+                    <i class="fa-solid fa-arrow-trend-up" style="color:#15803d; font-size:12px"></i>Top Income
+                </p>
+                <div style="height:180px; display:flex; align-items:center; justify-content:center">
                     <canvas id="chartIncome"></canvas>
                 </div>
-                <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0">
-                    <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em">Top Expenses</p>
+            </div>
+
+            <!-- TOP EXPENSES -->
+            <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0; margin-bottom:12px">
+                <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:6px">
+                    <i class="fa-solid fa-arrow-trend-down" style="color:#991b1b; font-size:12px"></i>Top Expenses
+                </p>
+                <div style="height:180px; display:flex; align-items:center; justify-content:center">
                     <canvas id="chartExpenses"></canvas>
                 </div>
-                <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0">
-                    <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em">Top Savings</p>
+            </div>
+
+            <!-- TOP SAVINGS -->
+            <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0; margin-bottom:12px">
+                <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:6px">
+                    <i class="fa-solid fa-piggy-bank" style="color:#1e40af; font-size:12px"></i>Top Savings
+                </p>
+                <div style="height:180px; display:flex; align-items:center; justify-content:center">
                     <canvas id="chartSavings"></canvas>
                 </div>
-                <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0">
-                    <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em">Aktual per Bulan</p>
+            </div>
+
+            <!-- AKTUAL PER BULAN -->
+            <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0">
+                <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em">Aktual per Bulan</p>
+                <div style="height:220px">
                     <canvas id="chartMonthly"></canvas>
                 </div>
             </div>
