@@ -17,8 +17,6 @@
             --sav: #1e40af;
         }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; }
-
-        /* Sidebar */
         .sidebar-bg { background: var(--sidebar); }
         .nav-link {
             display: flex; align-items: center; gap: 12px;
@@ -29,40 +27,22 @@
         .nav-link:hover { background: var(--sidebar-hover); color: #e2e8f0; }
         .nav-link.active { background: var(--sidebar-active); color: #38bdf8; }
         .nav-link .icon { width: 18px; text-align: center; font-size: 15px; }
-
-        /* Pages */
         .page { display: none; }
         .page.active { display: block; }
-
-        /* Mobile bottom nav */
         .mob-btn { flex: 1; padding: 10px 4px; display: flex; flex-direction: column; align-items: center; gap: 3px; color: #64748b; border: none; background: none; font-size: 10px; cursor: pointer; transition: color 0.15s; }
         .mob-btn.active { color: #38bdf8; }
         .mob-btn i { font-size: 17px; }
-
-        /* Progress bar */
         .pbar { height: 6px; border-radius: 3px; background: #e2e8f0; overflow: hidden; }
         .pbar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
-
-        /* Cards */
         .stat-card { border-radius: 12px; padding: 16px; }
-
-        /* Table */
         table { border-collapse: collapse; width: 100%; }
         th { font-weight: 600; font-size: 11px; letter-spacing: 0.05em; }
-
-        /* Toast */
         #toast { position: fixed; bottom: 80px; right: 16px; background: #1e293b; color: white; padding: 10px 16px; border-radius: 10px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
         #toast.show { opacity: 1; }
-
-        /* Loading */
         #loadingOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 998; display: flex; align-items: center; justify-content: center; }
         #loadingOverlay.hidden { display: none; }
-
-        /* Scrollbar */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
-
-        /* Badge type */
         .badge-income { background: #dcfce7; color: #166534; }
         .badge-expenses { background: #fee2e2; color: #991b1b; }
         .badge-savings { background: #dbeafe; color: #1e40af; }
@@ -70,7 +50,6 @@
 </head>
 <body>
 
-<!-- Loading Overlay -->
 <div id="loadingOverlay">
     <div style="background:white; border-radius:16px; padding:28px 36px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.3)">
         <i class="fa-solid fa-spinner fa-spin" style="font-size:28px; color:#3b82f6; display:block; margin-bottom:12px"></i>
@@ -78,12 +57,10 @@
     </div>
 </div>
 
-<!-- Toast -->
 <div id="toast"></div>
 
 <div style="display:flex; min-height:100vh;">
 
-    <!-- ===== SIDEBAR DESKTOP ===== -->
     <aside class="sidebar-bg" style="width:220px; min-height:100vh; position:fixed; top:0; left:0; z-index:40; flex-direction:column; display:none;" id="sidebar-desktop">
         <div style="padding:20px 16px 16px; border-bottom:1px solid rgba(255,255,255,0.08)">
             <div style="display:flex; align-items:center; gap:10px">
@@ -115,10 +92,8 @@
         </div>
     </aside>
 
-    <!-- ===== MAIN CONTENT ===== -->
     <main id="main-content" style="flex:1; overflow-y:auto; padding-bottom:72px">
 
-        <!-- Mobile Header -->
         <header class="sidebar-bg" id="mobile-header" style="display:flex; align-items:center; gap:12px; padding:14px 16px; position:sticky; top:0; z-index:30; box-shadow:0 2px 8px rgba(0,0,0,0.3)">
             <div style="width:28px; height:28px; background:linear-gradient(135deg,#38bdf8,#2563eb); border-radius:7px; display:flex; align-items:center; justify-content:center">
                 <i class="fa-solid fa-wallet" style="color:white; font-size:12px"></i>
@@ -129,8 +104,6 @@
 
         <!-- ============ PAGE: DASHBOARD ============ -->
         <div id="page-dashboard" class="page active" style="padding:16px">
-
-            <!-- Filter Row -->
             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:16px">
                 <h2 style="font-size:18px; font-weight:700; color:#0f172a; margin:0; flex:1">Dashboard</h2>
                 <div style="display:flex; gap:8px; flex-wrap:wrap">
@@ -153,7 +126,6 @@
                 </div>
             </div>
 
-            <!-- Summary Cards -->
             <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:16px" id="summaryCards">
                 <div class="stat-card" style="background:linear-gradient(135deg,#15803d,#166534); color:white">
                     <div style="font-size:11px; opacity:0.8; margin-bottom:6px; display:flex; align-items:center; gap:6px">
@@ -181,14 +153,12 @@
                 </div>
             </div>
 
-            <!-- Breakdown Tables -->
             <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px">
                 <div id="breakdown-income"></div>
                 <div id="breakdown-expenses"></div>
                 <div id="breakdown-savings"></div>
             </div>
 
-            <!-- TOP INCOME -->
             <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0; margin-bottom:12px">
                 <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:6px">
                     <i class="fa-solid fa-arrow-trend-up" style="color:#15803d; font-size:12px"></i>Top Income
@@ -198,7 +168,6 @@
                 </div>
             </div>
 
-            <!-- TOP EXPENSES -->
             <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0; margin-bottom:12px">
                 <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:6px">
                     <i class="fa-solid fa-arrow-trend-down" style="color:#991b1b; font-size:12px"></i>Top Expenses
@@ -208,7 +177,6 @@
                 </div>
             </div>
 
-            <!-- TOP SAVINGS -->
             <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0; margin-bottom:12px">
                 <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:6px">
                     <i class="fa-solid fa-piggy-bank" style="color:#1e40af; font-size:12px"></i>Top Savings
@@ -218,7 +186,6 @@
                 </div>
             </div>
 
-            <!-- AKTUAL PER BULAN -->
             <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0">
                 <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em">Aktual per Bulan</p>
                 <div style="height:220px">
@@ -237,7 +204,6 @@
             </div>
             <p style="color:#64748b; font-size:13px; margin:0 0 16px">Tambah, edit, atau hapus kategori untuk masing-masing jenis transaksi. Klik Simpan untuk menyinkronkan ke Google Sheets.</p>
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px">
-                <!-- Income -->
                 <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
                     <div style="background:#15803d; color:white; padding:12px 16px; display:flex; align-items:center; justify-content:space-between">
                         <span style="font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px">
@@ -247,7 +213,6 @@
                     </div>
                     <div id="setup-income" style="padding:12px; display:flex; flex-direction:column; gap:6px"></div>
                 </div>
-                <!-- Expenses -->
                 <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
                     <div style="background:#991b1b; color:white; padding:12px 16px; display:flex; align-items:center; justify-content:space-between">
                         <span style="font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px">
@@ -257,7 +222,6 @@
                     </div>
                     <div id="setup-expenses" style="padding:12px; display:flex; flex-direction:column; gap:6px"></div>
                 </div>
-                <!-- Savings -->
                 <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
                     <div style="background:#1e40af; color:white; padding:12px 16px; display:flex; align-items:center; justify-content:space-between">
                         <span style="font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px">
@@ -283,22 +247,27 @@
             <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center">
                 <div style="display:flex; flex-direction:column; gap:4px">
                     <label style="font-size:11px; font-weight:600; color:#64748b">Bulan</label>
-                    <select id="budgetBulan" onchange="renderBudgetPlanning()" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:8px; font-size:13px; min-width:130px"></select>
+                    <select id="budgetBulan" onchange="renderBudgetPlanning()" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:7px; font-size:13px; font-weight:600; outline:none; cursor:pointer">
+                        <option value="1">Januari</option><option value="2">Februari</option>
+                        <option value="3">Maret</option><option value="4">April</option>
+                        <option value="5">Mei</option><option value="6">Juni</option>
+                        <option value="7">Juli</option><option value="8">Agustus</option>
+                        <option value="9">September</option><option value="10">Oktober</option>
+                        <option value="11">November</option><option value="12">Desember</option>
+                    </select>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:4px">
                     <label style="font-size:11px; font-weight:600; color:#64748b">Tahun</label>
-                    <select id="budgetTahun" onchange="renderBudgetPlanning()" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:8px; font-size:13px; min-width:110px"></select>
+                    <select id="budgetTahun" onchange="renderBudgetPlanning()" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:7px; font-size:13px; font-weight:600; outline:none; cursor:pointer"></select>
                 </div>
-                <div id="budgetPeriodInfo" style="font-size:12px; color:#64748b; margin-left:auto"></div>
             </div>
 
-            <div id="budgetSummary" style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:14px"></div>
-
-            <div style="display:flex; flex-direction:column; gap:12px">
-                <div id="budget-income"></div>
-                <div id="budget-expenses"></div>
-                <div id="budget-savings"></div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px">
+                <div id="budget-income" style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0"></div>
+                <div id="budget-expenses" style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0"></div>
+                <div id="budget-savings" style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0"></div>
             </div>
+            <div id="budgetSummary" style="margin-top:14px"></div>
         </div>
 
         <!-- ============ PAGE: BUDGET TRACKING ============ -->
@@ -310,43 +279,39 @@
                 <!-- Form -->
                 <div style="background:white; border-radius:12px; padding:16px; border:1px solid #e2e8f0">
                     <h3 style="font-size:14px; font-weight:700; color:#0f172a; margin:0 0 14px; padding-bottom:10px; border-bottom:1px solid #f1f5f9">Tambah Transaksi</h3>
-                    <form id="formTransaksi">
+                    <form id="formTransaksi" style="display:flex; flex-direction:column; gap:12px; text-align:left">
                         <input type="hidden" id="inputId">
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px">
-                            <div>
-                                <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.04em">Tanggal</label>
-                                <input type="date" id="inputTanggal" required style="width:100%; border:1px solid #e2e8f0; padding:8px 10px; border-radius:8px; font-size:13px; box-sizing:border-box; outline:none">
-                            </div>
-                            <div>
-                                <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.04em">Jenis</label>
-                                <select id="inputJenis" required style="width:100%; border:1px solid #e2e8f0; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600; box-sizing:border-box; outline:none; cursor:pointer; transition:all 0.15s">
-                                    <option value="Income">Income</option>
-                                    <option value="Expenses">Expenses</option>
-                                    <option value="Savings">Savings</option>
-                                </select>
-                            </div>
+                        <div style="display:flex; flex-direction:column; gap:5px">
+                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em">Tanggal</label>
+                            <input type="date" id="inputTanggal" required style="width:100%; border:1px solid #e2e8f0; padding:9px 12px; border-radius:8px; font-size:13px; box-sizing:border-box; outline:none; background:white">
                         </div>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px">
-                            <div>
-                                <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.04em">Kategori</label>
-                                <select id="inputKategori" required style="width:100%; border:1px solid #e2e8f0; padding:8px 10px; border-radius:8px; font-size:13px; box-sizing:border-box; outline:none; cursor:pointer">
-                                    <option value="">-- Pilih --</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.04em">Nominal (Rp)</label>
-                                <input type="text" id="inputNominal" placeholder="0" required style="width:100%; border:1px solid #e2e8f0; padding:8px 10px; border-radius:8px; font-size:13px; box-sizing:border-box; outline:none">
-                            </div>
+                        <div style="display:flex; flex-direction:column; gap:5px">
+                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em">Jenis</label>
+                            <select id="inputJenis" required style="width:100%; border:1px solid #e2e8f0; padding:9px 12px; border-radius:8px; font-size:13px; font-weight:600; box-sizing:border-box; outline:none; cursor:pointer; background:white">
+                                <option value="Income">Income</option>
+                                <option value="Expenses">Expenses</option>
+                                <option value="Savings">Savings</option>
+                            </select>
                         </div>
-                        <div style="margin-bottom:12px">
-                            <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.04em">Deskripsi</label>
-                            <input type="text" id="inputDeskripsi" placeholder="Opsional..." style="width:100%; border:1px solid #e2e8f0; padding:8px 10px; border-radius:8px; font-size:13px; box-sizing:border-box; outline:none">
+                        <div style="display:flex; flex-direction:column; gap:5px">
+                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em">Kategori</label>
+                            <select id="inputKategori" required style="width:100%; border:1px solid #e2e8f0; padding:9px 12px; border-radius:8px; font-size:13px; box-sizing:border-box; outline:none; cursor:pointer; background:white">
+                                <option value="">-- Pilih Kategori --</option>
+                            </select>
                         </div>
-                        <div style="display:flex; gap:8px">
-                            <button type="submit" id="btnSubmit" style="flex:1; background:#2563eb; color:white; border:none; padding:10px; border-radius:9px; font-weight:700; font-size:13px; cursor:pointer; transition:background 0.15s">
+                        <div style="display:flex; flex-direction:column; gap:5px">
+                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em">Nominal (Rp)</label>
+                            <input type="text" id="inputNominal" placeholder="0" required style="width:100%; border:1px solid #e2e8f0; padding:9px 12px; border-radius:8px; font-size:13px; box-sizing:border-box; outline:none">
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:5px">
+                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em">Deskripsi</label>
+                            <input type="text" id="inputDeskripsi" placeholder="Opsional..." style="width:100%; border:1px solid #e2e8f0; padding:9px 12px; border-radius:8px; font-size:13px; box-sizing:border-box; outline:none">
+                        </div>
+                        <div style="display:flex; gap:8px; margin-top:4px">
+                            <button type="submit" id="btnSubmit" style="flex:1; background:#2563eb; color:white; border:none; padding:11px; border-radius:9px; font-weight:700; font-size:13px; cursor:pointer; transition:background 0.15s">
                                 Simpan Transaksi
                             </button>
-                            <button type="button" id="btnCancel" onclick="resetForm()" style="background:#f1f5f9; color:#475569; border:none; padding:10px 14px; border-radius:9px; font-size:13px; cursor:pointer; display:none">
+                            <button type="button" id="btnCancel" onclick="resetForm()" style="background:#f1f5f9; color:#475569; border:none; padding:11px 14px; border-radius:9px; font-size:13px; cursor:pointer; display:none">
                                 Batal
                             </button>
                         </div>
@@ -386,11 +351,10 @@
                                     <th style="padding:10px 12px; text-align:right; border-bottom:1px solid #e2e8f0">Nominal</th>
                                     <th style="padding:10px 12px; text-align:left; border-bottom:1px solid #e2e8f0">Deskripsi</th>
                                     <th style="padding:10px 12px; text-align:left; border-bottom:1px solid #e2e8f0">Timestamp</th>
-                                    <th style="padding:10px 12px; text-align:center; border-bottom:1px solid #e2e8f0">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="tabelBody">
-                                <tr><td colspan="7" style="text-align:center; padding:24px; color:#94a3b8; font-size:13px">Memuat data...</td></tr>
+                                <tr><td colspan="6" style="text-align:center; padding:24px; color:#94a3b8; font-size:13px">Memuat data...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -398,10 +362,9 @@
             </div>
         </div>
 
-    </main><!-- end main -->
-</div><!-- end flex -->
+    </main>
+</div>
 
-<!-- ===== MOBILE BOTTOM NAV ===== -->
 <nav class="sidebar-bg" id="mobile-nav" style="position:fixed; bottom:0; left:0; right:0; display:flex; z-index:40; border-top:1px solid rgba(255,255,255,0.08); box-shadow:0 -4px 20px rgba(0,0,0,0.3)">
     <button class="mob-btn active" data-page="dashboard" onclick="showPage('dashboard')">
         <i class="fa-solid fa-chart-pie"></i><span>Dashboard</span>
@@ -418,7 +381,6 @@
 </nav>
 
 <script>
-// Responsive: tampilkan sidebar desktop atau mobile nav
 function applyLayout() {
     const isDesktop = window.innerWidth >= 768;
     document.getElementById('sidebar-desktop').style.display = isDesktop ? 'flex' : 'none';
