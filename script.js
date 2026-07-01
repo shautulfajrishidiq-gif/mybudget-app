@@ -8,7 +8,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycby58S2FMAJvh2tbl3Emu5eK
 // ==============================================
 let dataTransaksi = [];
 let daftarKategori = { Income: [], Expenses: [], Savings: [] };
-let dataBudget = []; // [{Jenis, Kategori, Bulan, Tahun, Budget}] - anggaran BULANAN
+let dataBudget = [];
 let chartInstances = {};
 
 // ==============================================
@@ -21,6 +21,7 @@ const JENIS_COLOR = {
 };
 const JENIS_ICON = { Income: 'fa-arrow-trend-up', Expenses: 'fa-arrow-trend-down', Savings: 'fa-piggy-bank' };
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const MONTHS_FULL = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const INCOME_COLORS  = ['#22c55e','#16a34a','#15803d','#4ade80','#86efac','#bbf7d0'];
 const EXP_COLORS     = ['#ef4444','#dc2626','#b91c1c','#f87171','#fca5a5','#f97316','#ea580c','#c2410c'];
 const SAV_COLORS     = ['#3b82f6','#2563eb','#1d4ed8','#60a5fa','#93c5fd','#bfdbfe'];
@@ -108,10 +109,7 @@ function getFilteredData() {
     });
 }
 
-function getBudgetMultiplier() {
-    // Deprecated (dulu bagi 12). Dipertahankan biar aman kalau masih ada pemanggilnya.
-    return 1;
-}
+function getBudgetMultiplier() { return 1; }
 
 function getSelectedBudgetPeriod() {
     const bEl = document.getElementById('budgetBulan');
@@ -285,28 +283,19 @@ function makeDoughnut(id, map, colors) {
     if (chartInstances[id]) chartInstances[id].destroy();
     const ctx = document.getElementById(id);
     if (!ctx) return;
-    
-    // Sort dan ambil top 5 saja untuk mobile
-    const sorted = Object.entries(map)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5);
-    
+
+    const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
     let labels = sorted.map(([k]) => k);
     let data = sorted.map(([, v]) => v);
-    
-    // Jika ada sisanya (> 5), kumpulkan sebagai "Others"
+
     const entries = Object.entries(map);
     if (entries.length > 5) {
         const othersSum = entries.slice(5).reduce((sum, [, v]) => sum + v, 0);
         labels.push('Lainnya');
         data.push(othersSum);
     }
-    
-    if (!labels.length) {
-        labels = ['Tidak ada data'];
-        data = [1];
-    }
-    
+    if (!labels.length) { labels = ['Tidak ada data']; data = [1]; }
+
     chartInstances[id] = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -314,27 +303,10 @@ function makeDoughnut(id, map, colors) {
             datasets: [{ data: data, backgroundColor: data.length <= 5 ? colors.slice(0, data.length) : [...colors.slice(0, 5), '#cbd5e1'], borderWidth: 0 }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            cutout: '60%',
+            responsive: true, maintainAspectRatio: true, cutout: '60%',
             plugins: {
-                legend: { 
-                    position: 'bottom', 
-                    labels: { 
-                        font: { size: 9 }, 
-                        boxWidth: 8, 
-                        padding: 6,
-                        usePointStyle: true
-                    } 
-                },
-                tooltip: { 
-                    callbacks: { 
-                        label: ctx => ' ' + formatRp(ctx.raw) 
-                    },
-                    padding: 8,
-                    titleFont: { size: 11 },
-                    bodyFont: { size: 10 }
-                }
+                legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 8, padding: 6, usePointStyle: true } },
+                tooltip: { callbacks: { label: ctx => ' ' + formatRp(ctx.raw) }, padding: 8, titleFont: { size: 11 }, bodyFont: { size: 10 } }
             }
         }
     });
@@ -348,7 +320,6 @@ function makeMonthlyBar(filtered) {
     const bulan = parseInt(document.getElementById('filterBulan').value);
 
     if (bulan !== 0) {
-        // Mode bulan: tampilkan 3 bar Income/Expenses/Savings
         const totals = { Income: 0, Expenses: 0, Savings: 0 };
         filtered.forEach(i => { if (totals[i.Jenis] !== undefined) totals[i.Jenis] += Number(i.Nominal); });
         chartInstances['chartMonthly'] = new Chart(ctx, {
@@ -358,40 +329,19 @@ function makeMonthlyBar(filtered) {
                 datasets: [{
                     data: [totals.Income, totals.Expenses, totals.Savings],
                     backgroundColor: ['#22c55e', '#ef4444', '#3b82f6'],
-                    borderRadius: 6,
-                    borderSkipped: false
+                    borderRadius: 6, borderSkipped: false
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                indexAxis: undefined,
-                plugins: { 
-                    legend: { display: false }, 
-                    tooltip: { 
-                        callbacks: { label: c => formatRp(c.raw) },
-                        padding: 8,
-                        titleFont: { size: 11 },
-                        bodyFont: { size: 10 }
-                    } 
-                },
-                scales: { 
-                    y: { 
-                        ticks: { 
-                            callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', 
-                            font: { size: 9 } 
-                        }, 
-                        grid: { color: '#f1f5f9' },
-                        beginAtZero: true
-                    },
-                    x: {
-                        ticks: { font: { size: 10 } }
-                    }
+                responsive: true, maintainAspectRatio: true,
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => formatRp(c.raw) }, padding: 8, titleFont: { size: 11 }, bodyFont: { size: 10 } } },
+                scales: {
+                    y: { ticks: { callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', font: { size: 9 } }, grid: { color: '#f1f5f9' }, beginAtZero: true },
+                    x: { ticks: { font: { size: 10 } } }
                 }
             }
         });
     } else {
-        // Mode year: tampilkan per bulan
         const monthly = { Income: Array(12).fill(0), Expenses: Array(12).fill(0), Savings: Array(12).fill(0) };
         dataTransaksi
             .filter(i => new Date(i.Tanggal).getFullYear() === tahun)
@@ -410,37 +360,14 @@ function makeMonthlyBar(filtered) {
                 ]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: true,
+                responsive: true, maintainAspectRatio: true,
                 plugins: {
-                    legend: { 
-                        position: 'bottom', 
-                        labels: { 
-                            font: { size: 9 }, 
-                            boxWidth: 8, 
-                            padding: 6,
-                            usePointStyle: true
-                        } 
-                    },
-                    tooltip: { 
-                        callbacks: { label: c => c.dataset.label + ': ' + formatRp(c.raw) },
-                        padding: 8,
-                        titleFont: { size: 11 },
-                        bodyFont: { size: 10 }
-                    }
+                    legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 8, padding: 6, usePointStyle: true } },
+                    tooltip: { callbacks: { label: c => c.dataset.label + ': ' + formatRp(c.raw) }, padding: 8, titleFont: { size: 11 }, bodyFont: { size: 10 } }
                 },
-                scales: { 
-                    y: { 
-                        ticks: { 
-                            callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', 
-                            font: { size: 9 } 
-                        }, 
-                        grid: { color: '#f1f5f9' },
-                        beginAtZero: true
-                    },
-                    x: {
-                        ticks: { font: { size: 9 } }
-                    }
+                scales: {
+                    y: { ticks: { callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', font: { size: 9 } }, grid: { color: '#f1f5f9' }, beginAtZero: true, stacked: false },
+                    x: { ticks: { font: { size: 9 } }, stacked: false }
                 }
             }
         });
@@ -451,50 +378,31 @@ function makeMonthlyBar(filtered) {
 // SETUP
 // ==============================================
 function renderSetup() {
-    ['Income', 'Expenses', 'Savings'].forEach(jenis => {
-        const container = document.getElementById('setup-' + jenis.toLowerCase());
-        container.innerHTML = '';
-        (daftarKategori[jenis] || []).forEach((kat, i) => {
-            const div = document.createElement('div');
-            div.style.cssText = 'display:flex; align-items:center; gap:8px';
-            div.innerHTML = `
-                <input type="text" value="${kat}"
-                    data-jenis="${jenis}" data-index="${i}"
-                    style="flex:1; border:1px solid #e2e8f0; padding:7px 10px; border-radius:8px; font-size:13px; outline:none; transition:border 0.15s"
-                    onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e2e8f0'">
-                <button onclick="removeKategori('${jenis}',${i})"
-                    style="background:#fee2e2; color:#dc2626; border:none; border-radius:7px; width:30px; height:30px; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0"
-                    title="Hapus">×</button>
-            `;
-            container.appendChild(div);
+    ['Income', 'Expenses', 'Savings'].forEach(j => {
+        const el = document.getElementById('setup-' + j.toLowerCase());
+        el.innerHTML = (daftarKategori[j] || []).map((kat, idx) => `
+            <div style="display:flex; align-items:center; gap:6px">
+                <input type="text" value="${kat}" data-jenis="${j}" data-idx="${idx}"
+                    style="flex:1; border:1px solid #e2e8f0; padding:6px 10px; border-radius:6px; font-size:13px; outline:none">
+                <button onclick="removeKategori('${j}', ${idx})" style="background:#fef2f2; color:#dc2626; border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:11px">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+        `).join('');
+    });
+}
+function addKategori(j) { (daftarKategori[j] = daftarKategori[j] || []).push(''); renderSetup(); }
+function removeKategori(j, idx) { daftarKategori[j].splice(idx, 1); renderSetup(); }
+function collectSetup() {
+    const out = { Income: [], Expenses: [], Savings: [] };
+    ['Income', 'Expenses', 'Savings'].forEach(j => {
+        document.querySelectorAll(`#setup-${j.toLowerCase()} input`).forEach(inp => {
+            const v = inp.value.trim();
+            if (v) out[j].push(v);
         });
     });
+    return out;
 }
-
-function addKategori(jenis) {
-    daftarKategori[jenis] = daftarKategori[jenis] || [];
-    daftarKategori[jenis].push('');
-    renderSetup();
-    const container = document.getElementById('setup-' + jenis.toLowerCase());
-    const inputs = container.querySelectorAll('input');
-    if (inputs.length) inputs[inputs.length - 1].focus();
-}
-
-function removeKategori(jenis, index) {
-    daftarKategori[jenis].splice(index, 1);
-    renderSetup();
-}
-
-function collectSetup() {
-    const result = { Income: [], Expenses: [], Savings: [] };
-    ['Income', 'Expenses', 'Savings'].forEach(jenis => {
-        document.getElementById('setup-' + jenis.toLowerCase())
-            .querySelectorAll('input')
-            .forEach(inp => { const v = inp.value.trim(); if (v) result[jenis].push(v); });
-    });
-    return result;
-}
-
 async function saveSetup() {
     const values = collectSetup();
     daftarKategori = values;
@@ -571,18 +479,12 @@ async function saveBudget() {
     document.querySelectorAll('#page-budget input[data-jenis]').forEach(inp => {
         const raw = parseInt(inp.dataset.raw || inp.value.replace(/\D/g, '')) || 0;
         currentPeriod.push({
-            Jenis: inp.dataset.jenis,
-            Kategori: inp.dataset.kategori,
-            Bulan: bulan,
-            Tahun: tahun,
-            Budget: raw
+            Jenis: inp.dataset.jenis, Kategori: inp.dataset.kategori,
+            Bulan: bulan, Tahun: tahun, Budget: raw
         });
     });
 
-    // Gabungkan: keep periode lain, replace periode yang sedang diedit (hanya simpan yang > 0)
-    const others = dataBudget.filter(b =>
-        !(Number(b.Bulan) === bulan && Number(b.Tahun) === tahun)
-    );
+    const others = dataBudget.filter(b => !(Number(b.Bulan) === bulan && Number(b.Tahun) === tahun));
     const kept = currentPeriod.filter(b => Number(b.Budget) > 0);
     const budgets = [...others, ...kept];
     dataBudget = budgets;
@@ -603,17 +505,30 @@ async function saveBudget() {
 }
 
 // ==============================================
-// SISA ANGGARAN (TRACKING PAGE)
+// SISA ANGGARAN (TRACKING PAGE) — pakai bulan dari tanggal input
 // ==============================================
+function getTrackingPeriod() {
+    const dateStr = document.getElementById('inputTanggal')?.value;
+    let d = dateStr ? new Date(dateStr) : new Date();
+    if (isNaN(d.getTime())) d = new Date();
+    return { bulan: d.getMonth() + 1, tahun: d.getFullYear() };
+}
+
 function renderSisaAnggaran() {
     const container = document.getElementById('sisaAnggaran');
-    const now = new Date();
+    if (!container) return;
+    const { bulan, tahun } = getTrackingPeriod();
     const cats = daftarKategori.Expenses || [];
+
+    // Update judul (Bulan Ini -> nama bulan yang dipilih)
+    const titleEl = document.getElementById('sisaAnggaranTitle');
+    if (titleEl) titleEl.textContent = `Sisa Anggaran Expenses (${MONTHS_FULL[bulan - 1]} ${tahun})`;
 
     const actuals = {};
     dataTransaksi.filter(i => {
+        if (i.Jenis !== 'Expenses' || !i.Tanggal) return false;
         const d = new Date(i.Tanggal);
-        return i.Jenis === 'Expenses' && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+        return d.getFullYear() === tahun && (d.getMonth() + 1) === bulan;
     }).forEach(i => { actuals[i.Kategori] = (actuals[i.Kategori] || 0) + Number(i.Nominal); });
 
     if (!cats.length) {
@@ -622,7 +537,7 @@ function renderSisaAnggaran() {
     }
 
     container.innerHTML = cats.map(kat => {
-        const monthBudget = getBudgetOf('Expenses', kat, now.getMonth() + 1, now.getFullYear());
+        const monthBudget = getBudgetOf('Expenses', kat, bulan, tahun);
         const spent = actuals[kat] || 0;
         if (monthBudget === 0) return `
             <div style="display:flex; justify-content:space-between; font-size:12px; color:#64748b">
@@ -648,12 +563,12 @@ function renderSisaAnggaran() {
 }
 
 // ==============================================
-// TABEL TRANSAKSI
+// TABEL TRANSAKSI — Tanggal | Jenis | Kategori | Nominal | Deskripsi | Timestamp | Aksi
 // ==============================================
 function renderTabel(data) {
     const tbody = document.getElementById('tabelBody');
     if (!data || !data.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:28px; color:#94a3b8; font-size:13px"><i class="fa-solid fa-inbox" style="display:block; font-size:24px; margin-bottom:8px"></i>Belum ada transaksi.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:28px; color:#94a3b8; font-size:13px"><i class="fa-solid fa-inbox" style="display:block; font-size:24px; margin-bottom:8px"></i>Belum ada transaksi.</td></tr>';
         return;
     }
     tbody.innerHTML = [...data].reverse().map(item => {
@@ -663,12 +578,14 @@ function renderTabel(data) {
         const badge = isInc ? 'badge-income' : isSav ? 'badge-savings' : 'badge-expenses';
         return `
         <tr style="border-bottom:1px solid #f1f5f9; font-size:12px; transition:background 0.1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-            <td style="padding:10px 12px; color:#64748b; white-space:nowrap">${item.Tanggal}</td>
+            <td style="padding:10px 12px; color:#64748b; white-space:nowrap">${item.Tanggal || '-'}</td>
             <td style="padding:10px 12px">
-                <span class="${badge}" style="padding:3px 8px; border-radius:20px; font-size:11px; font-weight:600">${item.Kategori}</span>
+                <span class="${badge}" style="padding:3px 8px; border-radius:20px; font-size:11px; font-weight:600">${item.Jenis || '-'}</span>
             </td>
-            <td style="padding:10px 12px; color:#64748b; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${item.Deskripsi || '-'}</td>
+            <td style="padding:10px 12px; color:#0f172a; font-weight:500">${item.Kategori || '-'}</td>
             <td style="padding:10px 12px; text-align:right; font-weight:700; color:${color}; white-space:nowrap">${op} ${formatRp(item.Nominal)}</td>
+            <td style="padding:10px 12px; color:#64748b; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${item.Deskripsi || '-'}</td>
+            <td style="padding:10px 12px; color:#94a3b8; white-space:nowrap; font-size:11px">${item.Timestamp || '-'}</td>
             <td style="padding:10px 12px; text-align:center; white-space:nowrap">
                 <button onclick="siapkanEdit('${item.ID}')" style="background:#eff6ff; color:#2563eb; border:none; border-radius:6px; width:28px; height:28px; cursor:pointer; font-size:12px; margin-right:4px" title="Edit">
                     <i class="fa-solid fa-pen"></i>
@@ -704,6 +621,9 @@ document.getElementById('inputJenis').addEventListener('change', function () {
     warnaiJenis(this.value);
 });
 
+// Ubah judul & sisa anggaran ketika tanggal diganti
+document.getElementById('inputTanggal').addEventListener('change', renderSisaAnggaran);
+
 const inputNominal = document.getElementById('inputNominal');
 inputNominal.addEventListener('input', function () {
     const raw = this.value.replace(/\D/g, '');
@@ -724,7 +644,7 @@ function terapkanFilter() {
 }
 
 // ==============================================
-// SUBMIT FORM
+// SUBMIT FORM — kirim key kapital agar cocok dgn backend
 // ==============================================
 document.getElementById('formTransaksi').addEventListener('submit', async function (e) {
     e.preventDefault();
@@ -735,13 +655,20 @@ document.getElementById('formTransaksi').addEventListener('submit', async functi
 
     const id = document.getElementById('inputId').value;
     const payload = {
-        action: id ? 'update' : 'insert', id,
-        tanggal: document.getElementById('inputTanggal').value,
-        jenis: document.getElementById('inputJenis').value,
-        kategori: document.getElementById('inputKategori').value,
-        nominal: getNominalRaw(),
-        deskripsi: document.getElementById('inputDeskripsi').value
+        action: id ? 'update' : 'insert',
+        ID: id,
+        Tanggal: document.getElementById('inputTanggal').value,
+        Jenis: document.getElementById('inputJenis').value,
+        Kategori: document.getElementById('inputKategori').value,
+        Nominal: getNominalRaw(),
+        Deskripsi: document.getElementById('inputDeskripsi').value
     };
+
+    if (!payload.Tanggal || !payload.Jenis || !payload.Kategori || !payload.Nominal) {
+        showToast('Lengkapi Tanggal, Jenis, Kategori, dan Nominal.', true);
+        btn.innerHTML = orig; btn.disabled = false;
+        return;
+    }
 
     try {
         const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
@@ -763,13 +690,14 @@ function siapkanEdit(id) {
     if (!t) return;
     showPage('tracking');
     document.getElementById('inputId').value = t.ID;
-    document.getElementById('inputTanggal').value = t.Tanggal.split('T')[0];
+    document.getElementById('inputTanggal').value = (t.Tanggal || '').split('T')[0];
     document.getElementById('inputJenis').value = t.Jenis;
     warnaiJenis(t.Jenis);
     populateKategoriDropdown(t.Jenis, t.Kategori);
     inputNominal.value = formatNum(t.Nominal);
     inputNominal.dataset.raw = String(t.Nominal);
     document.getElementById('inputDeskripsi').value = t.Deskripsi || '';
+    renderSisaAnggaran();
 
     const btn = document.getElementById('btnSubmit');
     btn.innerHTML = '<i class="fa-solid fa-pen"></i> Update Transaksi';
@@ -788,12 +716,13 @@ function resetForm() {
     btn.innerHTML = 'Simpan Transaksi';
     btn.style.background = '#2563eb';
     document.getElementById('btnCancel').style.display = 'none';
+    renderSisaAnggaran();
 }
 
 async function hapusTransaksi(id) {
     if (!confirm('Hapus transaksi ini?')) return;
     try {
-        const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'delete', id }) });
+        const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'delete', ID: id }) });
         const res = await r.json();
         if (res.status === 'success') { await loadData(); showToast('✓ Transaksi dihapus!'); }
         else showToast('Gagal hapus: ' + res.message, true);
@@ -819,4 +748,13 @@ function showToast(msg, isError = false) {
 // INIT
 // ==============================================
 warnaiJenis('Income');
+// Default tanggal input = hari ini agar sisa anggaran langsung sesuai
+(function initTanggal(){
+    const el = document.getElementById('inputTanggal');
+    if (el && !el.value) {
+        const d = new Date();
+        const iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        el.value = iso;
+    }
+})();
 loadData();
