@@ -425,6 +425,18 @@ async function saveSetup() {
 // ==============================================
 // BUDGET PLANNING
 // ==============================================
+// Hitung aktual per kategori (untuk Income auto-fill dari tracking)
+function getActualByCategory(jenis, bulan, tahun) {
+    const map = {};
+    dataTransaksi.forEach(i => {
+        if (i.Jenis !== jenis || !i.Tanggal) return;
+        const d = new Date(i.Tanggal);
+        if (d.getFullYear() !== tahun || (d.getMonth() + 1) !== bulan) return;
+        map[i.Kategori] = (map[i.Kategori] || 0) + Number(i.Nominal);
+    });
+    return map;
+}
+
 function renderBudgetPlanning() {
     ensureBudgetPeriodOptions();
     const { bulan, tahun } = getSelectedBudgetPeriod();
@@ -432,16 +444,45 @@ function renderBudgetPlanning() {
     const info = document.getElementById('budgetPeriodInfo');
     if (info) info.textContent = `Periode: ${MONTHS_SHORT[bulan - 1]} ${tahun}`;
 
-    ['Income', 'Expenses', 'Savings'].forEach(jenis => {
+    // === INCOME: auto-fill dari data tracking bulan tsb (read-only) ===
+    const incomeActuals = getActualByCategory('Income', bulan, tahun);
+    const incomeCats = [...new Set([...(daftarKategori.Income || []), ...Object.keys(incomeActuals)])];
+    const totalIncome = incomeCats.reduce((s, k) => s + (incomeActuals[k] || 0), 0);
+
+    const cInc = JENIS_COLOR.Income;
+    document.getElementById('budget-income').innerHTML = `
+        <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
+            <div style="background:${cInc.bg}; color:white; padding:12px 16px; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600">
+                <i class="fa-solid ${JENIS_ICON.Income}"></i>
+                Income <span style="opacity:0.7; font-weight:400; font-size:11px">(otomatis dari Tracking · ${MONTHS_SHORT[bulan - 1]} ${tahun})</span>
+                <span style="margin-left:auto; font-size:13px; font-weight:700">${formatRp(totalIncome)}</span>
+            </div>
+            <div style="padding:14px; display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px">
+                ${incomeCats.length ? incomeCats.map(kat => {
+                    const val = incomeActuals[kat] || 0;
+                    return `
+                    <div>
+                        <label style="font-size:11px; font-weight:600; color:#64748b; display:block; margin-bottom:5px">${kat}</label>
+                        <input type="text" readonly value="${val > 0 ? formatNum(val) : '0'}"
+                            style="width:100%; border:1px solid #e2e8f0; padding:8px 10px; border-radius:8px; font-size:13px; box-sizing:border-box; background:#f1f5f9; color:#0f172a; font-weight:600">
+                    </div>`;
+                }).join('') : '<p style="color:#94a3b8; font-size:13px; grid-column:1/-1">Belum ada income tercatat di bulan ini. Input dulu di halaman Tracking.</p>'}
+            </div>
+        </div>
+    `;
+
+    // === EXPENSES & SAVINGS: editable ===
+    ['Expenses', 'Savings'].forEach(jenis => {
         const c = JENIS_COLOR[jenis];
         const cats = daftarKategori[jenis] || [];
-        const container = document.getElementById('budget-' + jenis.toLowerCase());
-        container.innerHTML = `
+        const label = jenis === 'Savings' ? 'Savings (Tabungan — sisa dari Income setelah Expenses)' : jenis;
+        document.getElementById('budget-' + jenis.toLowerCase()).innerHTML = `
             <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
                 <div style="background:${c.bg}; color:white; padding:12px 16px; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600">
                     <i class="fa-solid ${JENIS_ICON[jenis]}"></i>
-                    ${jenis}
+                    ${label}
                     <span style="opacity:0.7; font-weight:400; font-size:11px; margin-left:4px">(${MONTHS_SHORT[bulan - 1]} ${tahun})</span>
+                    <span id="total-${jenis.toLowerCase()}" style="margin-left:auto; font-size:13px; font-weight:700"></span>
                 </div>
                 <div style="padding:14px; display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px">
                     ${cats.map(kat => {
@@ -464,18 +505,64 @@ function renderBudgetPlanning() {
             </div>
         `;
     });
+
+    // === Ringkasan alokasi ===
+    renderBudgetSummary();
+}
+
+function renderBudgetSummary() {
+    const { bulan, tahun } = getSelectedBudgetPeriod();
+    const totalIncome = Object.values(getActualByCategory('Income', bulan, tahun)).reduce((s, v) => s + v, 0);
+
+    let totExp = 0, totSav = 0;
+    document.querySelectorAll('#page-budget input[data-jenis]').forEach(inp => {
+        const raw = parseInt(inp.dataset.raw || inp.value.replace(/\D/g, '')) || 0;
+        if (inp.dataset.jenis === 'Expenses') totExp += raw;
+        else if (inp.dataset.jenis === 'Savings') totSav += raw;
+    });
+
+    const eEl = document.getElementById('total-expenses');
+    const sEl = document.getElementById('total-savings');
+    if (eEl) eEl.textContent = formatRp(totExp);
+    if (sEl) sEl.textContent = formatRp(totSav);
+
+    const sisa = totalIncome - totExp - totSav;
+    const box = document.getElementById('budgetSummary');
+    if (!box) return;
+    const okColor = sisa === 0 ? '#16a34a' : (sisa < 0 ? '#dc2626' : '#d97706');
+    const status = sisa === 0
+        ? '✓ Income teralokasi penuh'
+        : (sisa < 0 ? `⚠ Over-budget ${formatRp(Math.abs(sisa))}` : `Belum dialokasikan ${formatRp(sisa)}`);
+    box.innerHTML = `
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px">
+            <div><div style="font-size:11px; color:#64748b; font-weight:600">INCOME</div><div style="font-size:15px; font-weight:700; color:#16a34a">${formatRp(totalIncome)}</div></div>
+            <div><div style="font-size:11px; color:#64748b; font-weight:600">EXPENSES</div><div style="font-size:15px; font-weight:700; color:#dc2626">${formatRp(totExp)}</div></div>
+            <div><div style="font-size:11px; color:#64748b; font-weight:600">SAVINGS</div><div style="font-size:15px; font-weight:700; color:#2563eb">${formatRp(totSav)}</div></div>
+            <div><div style="font-size:11px; color:#64748b; font-weight:600">SISA (target 0)</div><div style="font-size:15px; font-weight:700; color:${okColor}">${formatRp(sisa)}</div></div>
+        </div>
+        <div style="margin-top:8px; font-size:12px; font-weight:600; color:${okColor}">${status}</div>
+    `;
 }
 
 function onBudgetInput(el) {
     const raw = el.value.replace(/\D/g, '');
     el.dataset.raw = raw;
     el.value = raw ? formatNum(raw) : '';
+    renderBudgetSummary();
 }
 
 async function saveBudget() {
     const { bulan, tahun } = getSelectedBudgetPeriod();
 
     const currentPeriod = [];
+
+    // Simpan Income otomatis dari aktual tracking
+    const incomeActuals = getActualByCategory('Income', bulan, tahun);
+    Object.entries(incomeActuals).forEach(([kat, val]) => {
+        currentPeriod.push({ Jenis: 'Income', Kategori: kat, Bulan: bulan, Tahun: tahun, Budget: Number(val) || 0 });
+    });
+
+    // Simpan Expenses & Savings dari input
     document.querySelectorAll('#page-budget input[data-jenis]').forEach(inp => {
         const raw = parseInt(inp.dataset.raw || inp.value.replace(/\D/g, '')) || 0;
         currentPeriod.push({
