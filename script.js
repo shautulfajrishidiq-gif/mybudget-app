@@ -8,7 +8,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycby58S2FMAJvh2tbl3Emu5eK
 // ==============================================
 let dataTransaksi = [];
 let daftarKategori = { Income: [], Expenses: [], Savings: [] };
-let dataBudget = []; // [{Jenis, Kategori, Budget}] - anggaran TAHUNAN
+let dataBudget = []; // [{Jenis, Kategori, Bulan, Tahun, Budget}] - anggaran BULANAN
 let chartInstances = {};
 
 // ==============================================
@@ -109,8 +109,56 @@ function getFilteredData() {
 }
 
 function getBudgetMultiplier() {
+    // Deprecated (dulu bagi 12). Dipertahankan biar aman kalau masih ada pemanggilnya.
+    return 1;
+}
+
+function getSelectedBudgetPeriod() {
+    const bEl = document.getElementById('budgetBulan');
+    const yEl = document.getElementById('budgetTahun');
+    const now = new Date();
+    const bulan = bEl && bEl.value ? parseInt(bEl.value) : (now.getMonth() + 1);
+    const tahun = yEl && yEl.value ? parseInt(yEl.value) : now.getFullYear();
+    return { bulan, tahun };
+}
+
+function ensureBudgetPeriodOptions() {
+    const bEl = document.getElementById('budgetBulan');
+    const yEl = document.getElementById('budgetTahun');
+    if (!bEl || !yEl) return;
+    const now = new Date();
+    if (!bEl.options.length) {
+        bEl.innerHTML = MONTHS_SHORT.map((m, i) =>
+            `<option value="${i + 1}" ${i + 1 === now.getMonth() + 1 ? 'selected' : ''}>${m}</option>`
+        ).join('');
+    }
+    if (!yEl.options.length) {
+        const y = now.getFullYear();
+        const years = [];
+        for (let i = y - 3; i <= y + 3; i++) years.push(i);
+        yEl.innerHTML = years.map(v =>
+            `<option value="${v}" ${v === y ? 'selected' : ''}>${v}</option>`
+        ).join('');
+    }
+}
+
+function getBudgetOf(jenis, kategori, bulan, tahun) {
+    const row = dataBudget.find(b =>
+        b.Jenis === jenis && b.Kategori === kategori &&
+        Number(b.Bulan) === Number(bulan) && Number(b.Tahun) === Number(tahun)
+    );
+    return row ? Number(row.Budget) : 0;
+}
+
+function getBudgetForFilter(jenis, kategori) {
+    const tahun = parseInt(document.getElementById('filterTahun').value);
     const bulan = parseInt(document.getElementById('filterBulan').value);
-    return bulan === 0 ? 1 : 1 / 12; // tahunan ÷ 12 untuk bulan
+    if (bulan === 0) {
+        return dataBudget
+            .filter(b => b.Jenis === jenis && b.Kategori === kategori && Number(b.Tahun) === tahun)
+            .reduce((s, b) => s + (Number(b.Budget) || 0), 0);
+    }
+    return getBudgetOf(jenis, kategori, bulan, tahun);
 }
 
 // ==============================================
@@ -151,8 +199,7 @@ function renderBreakdown(jenis, filtered, mult) {
     const allCats = [...new Set([...categories, ...Object.keys(actuals)])];
     const rows = allCats.map(kat => {
         const tracked = actuals[kat] || 0;
-        const bRow = dataBudget.find(b => b.Jenis === jenis && b.Kategori === kat);
-        const budget = bRow ? Number(bRow.Budget) * mult : 0;
+        const budget = getBudgetForFilter(jenis, kat);
         const pct = budget > 0 ? Math.round(tracked / budget * 100) : 0;
         const sisa = Math.max(budget - tracked, 0);
         const excess = budget > 0 && tracked > budget ? tracked - budget : 0;
@@ -471,6 +518,12 @@ async function saveSetup() {
 // BUDGET PLANNING
 // ==============================================
 function renderBudgetPlanning() {
+    ensureBudgetPeriodOptions();
+    const { bulan, tahun } = getSelectedBudgetPeriod();
+
+    const info = document.getElementById('budgetPeriodInfo');
+    if (info) info.textContent = `Periode: ${MONTHS_SHORT[bulan - 1]} ${tahun}`;
+
     ['Income', 'Expenses', 'Savings'].forEach(jenis => {
         const c = JENIS_COLOR[jenis];
         const cats = daftarKategori[jenis] || [];
@@ -480,17 +533,17 @@ function renderBudgetPlanning() {
                 <div style="background:${c.bg}; color:white; padding:12px 16px; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600">
                     <i class="fa-solid ${JENIS_ICON[jenis]}"></i>
                     ${jenis}
-                    <span style="opacity:0.7; font-weight:400; font-size:11px; margin-left:4px">(anggaran tahunan)</span>
+                    <span style="opacity:0.7; font-weight:400; font-size:11px; margin-left:4px">(${MONTHS_SHORT[bulan - 1]} ${tahun})</span>
                 </div>
                 <div style="padding:14px; display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px">
                     ${cats.map(kat => {
-                        const bRow = dataBudget.find(b => b.Jenis === jenis && b.Kategori === kat);
-                        const val = bRow ? Number(bRow.Budget) : 0;
+                        const val = getBudgetOf(jenis, kat, bulan, tahun);
                         return `
                         <div>
                             <label style="font-size:11px; font-weight:600; color:#64748b; display:block; margin-bottom:5px">${kat}</label>
                             <input type="text"
                                 data-jenis="${jenis}" data-kategori="${kat}"
+                                data-bulan="${bulan}" data-tahun="${tahun}"
                                 value="${val > 0 ? formatNum(val) : ''}"
                                 placeholder="0"
                                 oninput="onBudgetInput(this)"
@@ -512,12 +565,28 @@ function onBudgetInput(el) {
 }
 
 async function saveBudget() {
-    const budgets = [];
+    const { bulan, tahun } = getSelectedBudgetPeriod();
+
+    const currentPeriod = [];
     document.querySelectorAll('#page-budget input[data-jenis]').forEach(inp => {
         const raw = parseInt(inp.dataset.raw || inp.value.replace(/\D/g, '')) || 0;
-        budgets.push({ Jenis: inp.dataset.jenis, Kategori: inp.dataset.kategori, Budget: raw });
+        currentPeriod.push({
+            Jenis: inp.dataset.jenis,
+            Kategori: inp.dataset.kategori,
+            Bulan: bulan,
+            Tahun: tahun,
+            Budget: raw
+        });
     });
+
+    // Gabungkan: keep periode lain, replace periode yang sedang diedit (hanya simpan yang > 0)
+    const others = dataBudget.filter(b =>
+        !(Number(b.Bulan) === bulan && Number(b.Tahun) === tahun)
+    );
+    const kept = currentPeriod.filter(b => Number(b.Budget) > 0);
+    const budgets = [...others, ...kept];
     dataBudget = budgets;
+
     try {
         const r = await fetch(API_URL, {
             method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -553,8 +622,7 @@ function renderSisaAnggaran() {
     }
 
     container.innerHTML = cats.map(kat => {
-        const bRow = dataBudget.find(b => b.Jenis === 'Expenses' && b.Kategori === kat);
-        const monthBudget = bRow ? Number(bRow.Budget) / 12 : 0;
+        const monthBudget = getBudgetOf('Expenses', kat, now.getMonth() + 1, now.getFullYear());
         const spent = actuals[kat] || 0;
         if (monthBudget === 0) return `
             <div style="display:flex; justify-content:space-between; font-size:12px; color:#64748b">
