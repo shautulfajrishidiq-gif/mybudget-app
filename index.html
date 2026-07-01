@@ -278,7 +278,20 @@
                     <i class="fa-solid fa-floppy-disk"></i> Simpan
                 </button>
             </div>
-            <p style="color:#64748b; font-size:13px; margin:0 0 16px">Atur anggaran <strong>tahunan</strong> per kategori. Sisa anggaran di Tracking akan otomatis dihitung per bulan (÷12).</p>
+            <p style="color:#64748b; font-size:13px; margin:0 0 12px">Pilih <strong>Bulan</strong> &amp; <strong>Tahun</strong> dulu, lalu isi anggaran per kategori untuk periode tersebut.</p>
+
+            <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center">
+                <div style="display:flex; flex-direction:column; gap:4px">
+                    <label style="font-size:11px; font-weight:600; color:#64748b">Bulan</label>
+                    <select id="budgetBulan" onchange="renderBudgetPlanning()" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:8px; font-size:13px; min-width:130px"></select>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px">
+                    <label style="font-size:11px; font-weight:600; color:#64748b">Tahun</label>
+                    <select id="budgetTahun" onchange="renderBudgetPlanning()" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:8px; font-size:13px; min-width:110px"></select>
+                </div>
+                <div id="budgetPeriodInfo" style="font-size:12px; color:#64748b; margin-left:auto"></div>
+            </div>
+
             <div style="display:flex; flex-direction:column; gap:12px">
                 <div id="budget-income"></div>
                 <div id="budget-expenses"></div>
