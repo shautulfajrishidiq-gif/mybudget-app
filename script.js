@@ -238,20 +238,56 @@ function makeDoughnut(id, map, colors) {
     if (chartInstances[id]) chartInstances[id].destroy();
     const ctx = document.getElementById(id);
     if (!ctx) return;
-    const labels = Object.keys(map);
-    const data = Object.values(map);
+    
+    // Sort dan ambil top 5 saja untuk mobile
+    const sorted = Object.entries(map)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+    
+    let labels = sorted.map(([k]) => k);
+    let data = sorted.map(([, v]) => v);
+    
+    // Jika ada sisanya (> 5), kumpulkan sebagai "Others"
+    const entries = Object.entries(map);
+    if (entries.length > 5) {
+        const othersSum = entries.slice(5).reduce((sum, [, v]) => sum + v, 0);
+        labels.push('Lainnya');
+        data.push(othersSum);
+    }
+    
+    if (!labels.length) {
+        labels = ['Tidak ada data'];
+        data = [1];
+    }
+    
     chartInstances[id] = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: labels.length ? labels : ['Tidak ada data'],
-            datasets: [{ data: data.length ? data : [1], backgroundColor: data.length ? colors : ['#e2e8f0'], borderWidth: 0 }]
+            labels: labels,
+            datasets: [{ data: data, backgroundColor: data.length <= 5 ? colors.slice(0, data.length) : [...colors.slice(0, 5), '#cbd5e1'], borderWidth: 0 }]
         },
         options: {
             responsive: true,
-            cutout: '65%',
+            maintainAspectRatio: true,
+            cutout: '60%',
             plugins: {
-                legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10, padding: 8 } },
-                tooltip: { callbacks: { label: ctx => ' ' + formatRp(ctx.raw) } }
+                legend: { 
+                    position: 'bottom', 
+                    labels: { 
+                        font: { size: 9 }, 
+                        boxWidth: 8, 
+                        padding: 6,
+                        usePointStyle: true
+                    } 
+                },
+                tooltip: { 
+                    callbacks: { 
+                        label: ctx => ' ' + formatRp(ctx.raw) 
+                    },
+                    padding: 8,
+                    titleFont: { size: 11 },
+                    bodyFont: { size: 10 }
+                }
             }
         }
     });
@@ -275,13 +311,36 @@ function makeMonthlyBar(filtered) {
                 datasets: [{
                     data: [totals.Income, totals.Expenses, totals.Savings],
                     backgroundColor: ['#22c55e', '#ef4444', '#3b82f6'],
-                    borderRadius: 6
+                    borderRadius: 6,
+                    borderSkipped: false
                 }]
             },
             options: {
                 responsive: true,
-                plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => formatRp(c.raw) } } },
-                scales: { y: { ticks: { callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', font: { size: 9 } }, grid: { color: '#f1f5f9' } } }
+                maintainAspectRatio: true,
+                indexAxis: undefined,
+                plugins: { 
+                    legend: { display: false }, 
+                    tooltip: { 
+                        callbacks: { label: c => formatRp(c.raw) },
+                        padding: 8,
+                        titleFont: { size: 11 },
+                        bodyFont: { size: 10 }
+                    } 
+                },
+                scales: { 
+                    y: { 
+                        ticks: { 
+                            callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', 
+                            font: { size: 9 } 
+                        }, 
+                        grid: { color: '#f1f5f9' },
+                        beginAtZero: true
+                    },
+                    x: {
+                        ticks: { font: { size: 10 } }
+                    }
+                }
             }
         });
     } else {
@@ -298,18 +357,44 @@ function makeMonthlyBar(filtered) {
             data: {
                 labels: MONTHS_SHORT,
                 datasets: [
-                    { label: 'Income',   data: monthly.Income,   backgroundColor: '#4ade80', borderRadius: 3 },
-                    { label: 'Expenses', data: monthly.Expenses, backgroundColor: '#f87171', borderRadius: 3 },
-                    { label: 'Savings',  data: monthly.Savings,  backgroundColor: '#60a5fa', borderRadius: 3 }
+                    { label: 'Income',   data: monthly.Income,   backgroundColor: '#4ade80', borderRadius: 3, borderSkipped: false },
+                    { label: 'Expenses', data: monthly.Expenses, backgroundColor: '#f87171', borderRadius: 3, borderSkipped: false },
+                    { label: 'Savings',  data: monthly.Savings,  backgroundColor: '#60a5fa', borderRadius: 3, borderSkipped: false }
                 ]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: true,
                 plugins: {
-                    legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10, padding: 8 } },
-                    tooltip: { callbacks: { label: c => c.dataset.label + ': ' + formatRp(c.raw) } }
+                    legend: { 
+                        position: 'bottom', 
+                        labels: { 
+                            font: { size: 9 }, 
+                            boxWidth: 8, 
+                            padding: 6,
+                            usePointStyle: true
+                        } 
+                    },
+                    tooltip: { 
+                        callbacks: { label: c => c.dataset.label + ': ' + formatRp(c.raw) },
+                        padding: 8,
+                        titleFont: { size: 11 },
+                        bodyFont: { size: 10 }
+                    }
                 },
-                scales: { y: { ticks: { callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', font: { size: 9 } }, grid: { color: '#f1f5f9' } } }
+                scales: { 
+                    y: { 
+                        ticks: { 
+                            callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', 
+                            font: { size: 9 } 
+                        }, 
+                        grid: { color: '#f1f5f9' },
+                        beginAtZero: true
+                    },
+                    x: {
+                        ticks: { font: { size: 9 } }
+                    }
+                }
             }
         });
     }
