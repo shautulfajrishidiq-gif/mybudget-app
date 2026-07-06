@@ -6,11 +6,6 @@ const AUTH_KEY = 'mybudget_unlocked_v1';
 let currentUser = { email: '', isDev: false, registered: false };
 
 // ==============================================
-// CONFIG
-// ==============================================
-const API_URL = "https://script.google.com/macros/s/AKfycby58S2FMAJvh2tbl3Emu5eK1-a1iWTjxLJGvbTQ0eaoq9YaG-NHqkAeoXpetIxnk7gx/exec";
-
-// ==============================================
 // STATE
 // ==============================================
 let dataTransaksi = [];
@@ -36,6 +31,18 @@ const SAV_COLORS     = ['#3b82f6','#2563eb','#1d4ed8','#60a5fa','#93c5fd','#bfdb
 const formatRp = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(n) || 0);
 const formatNum = (n) => new Intl.NumberFormat('id-ID').format(Number(n) || 0);
 
+// ==============================================
+// API WRAPPER (google.script.run with Promise)
+// ==============================================
+function gasRun(funcName, ...args) {
+    return new Promise((resolve, reject) => {
+        google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            [funcName](...args);
+    });
+}
+
 function showSaving(text) {
     const el = document.getElementById('savingOverlay');
     if (!el) return;
@@ -45,15 +52,6 @@ function showSaving(text) {
 function hideSaving() {
     const el = document.getElementById('savingOverlay');
     if (el) el.classList.remove('show');
-}
-
-async function apiPost(payload) {
-    const r = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
-    });
-    return r.json();
 }
 
 function showAuthModal(mode) {
@@ -91,10 +89,11 @@ async function doLogout() {
 async function initAuth() {
     let status;
     try {
-        const r = await fetch(API_URL + '?action=authStatus');
-        status = await r.json();
+        status = await gasRun('getAuthStatus');
     } catch (err) {
-        alert('Gagal terhubung ke server: ' + err.message + '\n\nPastikan:\n1. URL deployment benar di API_URL\n2. Web app di-deploy dengan "Execute as: User accessing"\n3. Akses: Anyone with Google account');
+        setLoading(false);
+        alert('Gagal terhubung ke server: ' + err.message + 
+              '\n\nPastikan:\n1. Kode baru sudah di-deploy (Deploy > New deployment)\n2. Execute as: User accessing the web app\n3. Who has access: Anyone with Google account');
         return false;
     }
     if (!status || status.status !== 'success' || !status.email) {
@@ -137,10 +136,8 @@ document.getElementById('authForm').addEventListener('submit', async function (e
     showSaving(mode === 'register' ? 'Membuat spreadsheet baru...' : 'Masuk...');
 
     try {
-        const res = await apiPost({
-            action: mode === 'register' ? 'register' : 'login',
-            password: pw1
-        });
+        const funcName = mode === 'register' ? 'registerUser' : 'loginUser';
+        const res = await gasRun(funcName, pw1);
         if (res.status !== 'success') {
             errEl.textContent = res.message || 'Gagal.';
             return;
@@ -190,8 +187,7 @@ function showPage(page) {
 async function loadData() {
     setLoading(true);
     try {
-        const res = await fetch(API_URL + '?action=getData');
-        const result = await res.json();
+        const result = await gasRun('getUserData');
         if (result.status === 'success') {
             dataTransaksi = result.data || [];
             if (result.kategori) daftarKategori = result.kategori;
@@ -563,11 +559,7 @@ async function saveSetup() {
     const tahun = parseInt(document.getElementById('setupTahun').value) || 0;
     showSaving('Menyimpan kategori...');
     try {
-        const r = await fetch(API_URL, {
-            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'updateSetup', Bulan: bulan, Tahun: tahun, ...values })
-        });
-        const res = await r.json();
+        const res = await gasRun('saveSetupData', { Bulan: bulan, Tahun: tahun, ...values });
         if (res.status === 'success') {
             showToast('\u2713 Kategori tersimpan!');
             populateKategoriDropdown(document.getElementById('inputJenis').value);
@@ -728,11 +720,7 @@ async function saveBudget() {
     dataBudget = budgets;
 
     try {
-        const r = await fetch(API_URL, {
-            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'updateBudget', budgets })
-        });
-        const res = await r.json();
+        const res = await gasRun('saveBudgetData', budgets);
         if (res.status === 'success') {
             showToast('\u2713 Budget tersimpan!');
             renderSisaAnggaran();
@@ -890,7 +878,6 @@ document.getElementById('formTransaksi').addEventListener('submit', async functi
 
     const id = document.getElementById('inputId').value;
     const payload = {
-        action: id ? 'update' : 'insert',
         ID: id,
         Tanggal: document.getElementById('inputTanggal').value,
         Jenis: document.getElementById('inputJenis').value,
@@ -907,8 +894,8 @@ document.getElementById('formTransaksi').addEventListener('submit', async functi
 
     showSaving(id ? 'Memperbarui transaksi...' : 'Menyimpan transaksi...');
     try {
-        const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
-        const res = await r.json();
+        const funcName = id ? 'updateTransaction' : 'insertTransaction';
+        const res = await gasRun(funcName, payload);
         if (res.status === 'success') {
             resetForm();
             await loadData();
@@ -959,8 +946,7 @@ async function hapusTransaksi(id) {
     if (!confirm('Hapus transaksi ini?')) return;
     showSaving('Menghapus transaksi...');
     try {
-        const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'delete', ID: id }) });
-        const res = await r.json();
+        const res = await gasRun('deleteTransaction', id);
         if (res.status === 'success') { await loadData(); showToast('\u2713 Transaksi dihapus!'); }
         else showToast('Gagal hapus: ' + res.message, true);
     } catch (err) { showToast('Error: ' + err.message, true); }
@@ -999,7 +985,21 @@ warnaiJenis('Income');
 // STARTUP: auth gate lalu load data
 // ==============================================
 (async function startup() {
-    const ok = await initAuth();
-    if (ok) await loadData();
+    // Safety timeout: hide loading overlay after 15 seconds no matter what
+    setTimeout(() => {
+        const el = document.getElementById('loadingOverlay');
+        if (el && !el.classList.contains('hidden')) {
+            el.classList.add('hidden');
+            showToast('Memuat data lambat. Coba refresh halaman.', true);
+        }
+    }, 15000);
+
+    try {
+        const ok = await initAuth();
+        if (ok) await loadData();
+    } catch (err) {
+        setLoading(false);
+        showToast('Error startup: ' + err.message, true);
+    }
 })();
 </script>
