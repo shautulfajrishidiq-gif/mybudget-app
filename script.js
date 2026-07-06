@@ -3,7 +3,7 @@
 // ==============================================
 
 // >>> GANTI dengan URL deployment Apps Script kamu <<<
-const API_URL = "PASTE_URL_DEPLOYMENT_APPS_SCRIPT_DISINI";
+const API_URL = "https://script.google.com/macros/s/AKfycbzV2pMpuxo1JxtWkIkKJbJNftjiHnqfUb3C_LDqJSFYqFATS6TeMGeoZNra3uE10JEW/exec";
 
 // ==============================================
 // AUTH
