@@ -17,6 +17,7 @@ let dataTransaksi = [];
 let daftarKategori = { Income: [], Expenses: [], Savings: [] };
 let dataBudget = [];
 let chartInstances = {};
+let setupByPeriod = {}; // Simpan setup per bulan/tahun { "7-2026": { Income: [...], Expenses: [...], Savings: [...] } }
 
 // ==============================================
 // CONSTANTS
@@ -144,8 +145,8 @@ async function initAuth() {
         }
     } catch (err) {
         setLoading(false);
-        alert('GAGAL TERHUBUNG KE SERVER!\n\nError: ' + err.message +
-              '\n\nCek:\n1. Apps Script sudah di-deploy sebagai Web app\n2. Execute as: ME\n3. Who has access: Anyone\n\nURL: ' + API_URL);
+        alert('GAGAL TERHUBUNG KE SERVER!\\n\\nError: ' + err.message +
+              '\\n\\nCek:\\n1. Apps Script sudah di-deploy sebagai Web app\\n2. Execute as: ME\\n3. Who has access: Anyone\\n\\nURL: ' + API_URL);
         return false;
     }
 
@@ -246,6 +247,10 @@ async function loadData() {
             dataTransaksi = result.data || [];
             if (result.kategori) daftarKategori = result.kategori;
             if (result.budget) dataBudget = result.budget;
+            
+            // Build setupByPeriod dari kategori yang didapat
+            buildSetupByPeriod();
+            
             populateTahunFilter();
             renderDashboard();
             renderTabel(dataTransaksi);
@@ -262,12 +267,28 @@ async function loadData() {
     }
 }
 
+function buildSetupByPeriod() {
+    // Untuk sekarang, gunakan daftarKategori global sebagai default
+    // Nanti bisa disimpan per bulan jika perlu
+    setupByPeriod = {};
+    // Default: gunakan daftarKategori yang sudah ada
+}
+
+function getSetupForPeriod(bulan, tahun) {
+    const key = bulan + '-' + tahun;
+    if (setupByPeriod[key]) {
+        return setupByPeriod[key];
+    }
+    // Jika tidak ada, gunakan default (daftarKategori global)
+    return JSON.parse(JSON.stringify(daftarKategori));
+}
+
 async function refreshData() {
     const fab = document.getElementById('fabRefresh');
     fab.classList.add('spinning');
     await loadData();
     setTimeout(() => fab.classList.remove('spinning'), 500);
-    showToast('\u2713 Data diperbarui!');
+    showToast('✓ Data diperbarui!');
 }
 
 function populateTahunFilter() {
@@ -297,6 +318,15 @@ function getFilteredData() {
 function getSelectedBudgetPeriod() {
     const bEl = document.getElementById('budgetBulan');
     const yEl = document.getElementById('budgetTahun');
+    const now = new Date();
+    const bulan = bEl && bEl.value ? parseInt(bEl.value) : (now.getMonth() + 1);
+    const tahun = yEl && yEl.value ? parseInt(yEl.value) : now.getFullYear();
+    return { bulan, tahun };
+}
+
+function getSelectedSetupPeriod() {
+    const bEl = document.getElementById('setupBulan');
+    const yEl = document.getElementById('setupTahun');
     const now = new Date();
     const bulan = bEl && bEl.value ? parseInt(bEl.value) : (now.getMonth() + 1);
     const tahun = yEl && yEl.value ? parseInt(yEl.value) : now.getFullYear();
@@ -388,7 +418,7 @@ function renderBreakdown(jenis, filtered) {
     filtered.filter(i => i.Jenis === jenis).forEach(i => {
         actuals[i.Kategori] = (actuals[i.Kategori] || 0) + Number(i.Nominal);
     });
-    const allCats = [...new Set([...categories, ...Object.keys(actuals)])];
+    const allCats = [...new Set([...categories, ...Object.keys(actuals)])]
     const rows = allCats.map(kat => {
         const tracked = actuals[kat] || 0;
         const budget = getBudgetForFilter(jenis, kat);
@@ -536,13 +566,16 @@ function makeMonthlyBar(filtered) {
 }
 
 // ==============================================
-// SETUP
+// SETUP - PER BULAN/TAHUN DENGAN DEFAULT
 // ==============================================
 function renderSetup() {
     ensureSetupPeriodOptions();
+    const { bulan, tahun } = getSelectedSetupPeriod();
+    const setupForPeriod = getSetupForPeriod(bulan, tahun);
+    
     ['Income', 'Expenses', 'Savings'].forEach(j => {
         const el = document.getElementById('setup-' + j.toLowerCase());
-        el.innerHTML = (daftarKategori[j] || []).map((kat, idx) => `
+        el.innerHTML = (setupForPeriod[j] || []).map((kat, idx) => `
             <div style="display:flex; align-items:center; gap:6px">
                 <input type="text" value="${kat}" data-jenis="${j}" data-idx="${idx}"
                     style="flex:1; border:1px solid #e2e8f0; padding:6px 10px; border-radius:6px; font-size:13px; outline:none">
@@ -552,10 +585,37 @@ function renderSetup() {
             </div>
         `).join('');
     });
+    
+    // Tampilkan info sumber (dari default atau custom)
+    const sourceEl = document.getElementById('setupSourceInfo');
+    if (sourceEl) {
+        const key = bulan + '-' + tahun;
+        sourceEl.textContent = setupByPeriod[key] ? '✓ Custom setup' : '(Menggunakan default)';
+    }
 }
-function addKategori(j) { (daftarKategori[j] = daftarKategori[j] || []).push(''); renderSetup(); }
-function removeKategori(j, idx) { daftarKategori[j].splice(idx, 1); renderSetup(); }
+
+function addKategori(j) { 
+    const { bulan, tahun } = getSelectedSetupPeriod();
+    const key = bulan + '-' + tahun;
+    if (!setupByPeriod[key]) {
+        setupByPeriod[key] = JSON.parse(JSON.stringify(daftarKategori));
+    }
+    (setupByPeriod[key][j] = setupByPeriod[key][j] || []).push(''); 
+    renderSetup(); 
+}
+
+function removeKategori(j, idx) { 
+    const { bulan, tahun } = getSelectedSetupPeriod();
+    const key = bulan + '-' + tahun;
+    if (!setupByPeriod[key]) {
+        setupByPeriod[key] = JSON.parse(JSON.stringify(daftarKategori));
+    }
+    setupByPeriod[key][j].splice(idx, 1); 
+    renderSetup(); 
+}
+
 function collectSetup() {
+    const { bulan, tahun } = getSelectedSetupPeriod();
     const out = { Income: [], Expenses: [], Savings: [] };
     ['Income', 'Expenses', 'Savings'].forEach(j => {
         document.querySelectorAll(`#setup-${j.toLowerCase()} input`).forEach(inp => {
@@ -565,16 +625,26 @@ function collectSetup() {
     });
     return out;
 }
+
 async function saveSetup() {
+    const { bulan, tahun } = getSelectedSetupPeriod();
     const values = collectSetup();
-    daftarKategori = values;
-    const bulan = parseInt(document.getElementById('setupBulan').value) || 0;
-    const tahun = parseInt(document.getElementById('setupTahun').value) || 0;
+    const key = bulan + '-' + tahun;
+    
+    // Simpan setup untuk period ini
+    setupByPeriod[key] = values;
+    
+    // Update daftarKategori jika dipilih bulan/tahun saat ini
+    const now = new Date();
+    if (bulan === now.getMonth() + 1 && tahun === now.getFullYear()) {
+        daftarKategori = values;
+    }
+    
     showSaving('Menyimpan kategori...');
     try {
         const res = await apiPost({ action: 'updateSetup', Bulan: bulan, Tahun: tahun, ...values });
         if (res.status === 'success') {
-            showToast('\u2713 Kategori tersimpan!');
+            showToast('✓ Kategori tersimpan!');
             populateKategoriDropdown(document.getElementById('inputJenis').value);
             renderBudgetPlanning();
         } else { showToast('Gagal: ' + res.message, true); }
@@ -600,14 +670,14 @@ function renderBudgetPlanning() {
     ensureBudgetPeriodOptions();
     const { bulan, tahun } = getSelectedBudgetPeriod();
     const incomeActuals = getActualByCategory('Income', bulan, tahun);
-    const incomeCats = [...new Set([...(daftarKategori.Income || []), ...Object.keys(incomeActuals)])];
+    const incomeCats = [...new Set([...(daftarKategori.Income || []), ...Object.keys(incomeActuals)])] ;
     const totalIncome = incomeCats.reduce((s, k) => s + (incomeActuals[k] || 0), 0);
     const cInc = JENIS_COLOR.Income;
     document.getElementById('budget-income').innerHTML = `
         <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
             <div style="background:${cInc.bg}; color:white; padding:12px 16px; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600">
                 <i class="fa-solid ${JENIS_ICON.Income}"></i>
-                Income <span style="opacity:0.7; font-weight:400; font-size:11px">(otomatis dari Tracking \u00b7 ${MONTHS_SHORT[bulan - 1]} ${tahun})</span>
+                Income <span style="opacity:0.7; font-weight:400; font-size:11px">(otomatis dari Tracking · ${MONTHS_SHORT[bulan - 1]} ${tahun})</span>
                 <span style="margin-left:auto; font-size:13px; font-weight:700">${formatRp(totalIncome)}</span>
             </div>
             <div style="padding:14px; display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px">
@@ -664,7 +734,7 @@ function renderBudgetSummary() {
     const box = document.getElementById('budgetSummary');
     if (!box) return;
     const okColor = sisa === 0 ? '#16a34a' : (sisa < 0 ? '#dc2626' : '#d97706');
-    const status = sisa === 0 ? '\u2713 Income teralokasi penuh' : (sisa < 0 ? `\u26a0 Over-budget ${formatRp(Math.abs(sisa))}` : `Belum dialokasikan ${formatRp(sisa)}`);
+    const status = sisa === 0 ? '✓ Income teralokasi penuh' : (sisa < 0 ? `⚠ Over-budget ${formatRp(Math.abs(sisa))}` : `Belum dialokasikan ${formatRp(sisa)}`);
     box.innerHTML = `
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px">
             <div><div style="font-size:11px; color:#64748b; font-weight:600">INCOME</div><div style="font-size:15px; font-weight:700; color:#16a34a">${formatRp(totalIncome)}</div></div>
@@ -698,11 +768,17 @@ async function saveBudget() {
     const kept = currentPeriod.filter(b => Number(b.Budget) > 0);
     const budgets = [...others, ...kept];
     dataBudget = budgets;
+    
+    showSaving('Menyimpan budget...');
     try {
         const res = await apiPost({ action: 'updateBudget', budgets });
-        if (res.status === 'success') { showToast('\u2713 Budget tersimpan!'); renderSisaAnggaran(); }
+        if (res.status === 'success') { 
+            showToast('✓ Budget tersimpan!'); 
+            renderSisaAnggaran(); 
+        }
         else { showToast('Gagal: ' + res.message, true); }
     } catch (err) { showToast('Error: ' + err.message, true); }
+    finally { hideSaving(); }
 }
 
 // ==============================================
@@ -739,7 +815,7 @@ function renderSisaAnggaran() {
         return `<div>
             <div style="display:flex; justify-content:space-between; margin-bottom:4px">
                 <span style="font-size:12px; font-weight:600; color:#374151">${kat}</span>
-                <span style="font-size:11px; font-weight:700; color:${over ? '#dc2626' : '#16a34a'}">${over ? '\u26a0 -' + formatRp(Math.abs(sisa)) : formatRp(sisa)}</span>
+                <span style="font-size:11px; font-weight:700; color:${over ? '#dc2626' : '#16a34a'}">${over ? '⚠ -' + formatRp(Math.abs(sisa)) : formatRp(sisa)}</span>
             </div>
             <div class="pbar"><div class="pbar-fill" style="width:${pct}%; background:${over ? '#dc2626' : '#22c55e'}"></div></div>
             <div style="font-size:10px; color:#94a3b8; margin-top:3px">${formatRp(spent)} / ${formatRp(monthBudget)}</div>
@@ -759,7 +835,7 @@ function renderTabel(data) {
     tbody.innerHTML = [...data].reverse().map(item => {
         const isInc = item.Jenis === 'Income', isSav = item.Jenis === 'Savings';
         const color = isInc ? '#16a34a' : isSav ? '#b45309' : '#dc2626';
-        const op = isInc || isSav ? '+' : '\u2212';
+        const op = isInc || isSav ? '+' : '−';
         const badge = isInc ? 'badge-income' : isSav ? 'badge-savings' : 'badge-expenses';
         return `<tr style="border-bottom:1px solid #f1f5f9; font-size:12px; transition:background 0.1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
             <td style="padding:10px 12px; color:#64748b; white-space:nowrap">${item.Tanggal || '-'}</td>
@@ -829,7 +905,7 @@ document.getElementById('formTransaksi').addEventListener('submit', async functi
     showSaving(id ? 'Memperbarui transaksi...' : 'Menyimpan transaksi...');
     try {
         const res = await apiPost(payload);
-        if (res.status === 'success') { resetForm(); await loadData(); showToast(id ? '\u2713 Transaksi diperbarui!' : '\u2713 Transaksi disimpan!'); }
+        if (res.status === 'success') { resetForm(); await loadData(); showToast(id ? '✓ Transaksi diperbarui!' : '✓ Transaksi disimpan!'); }
         else { showToast('Gagal: ' + res.message, true); }
     } catch (err) { showToast('Error: ' + err.message, true); }
     finally { hideSaving(); btn.innerHTML = orig; btn.disabled = false; }
@@ -874,7 +950,7 @@ async function hapusTransaksi(id) {
     showSaving('Menghapus transaksi...');
     try {
         const res = await apiPost({ action: 'delete', ID: id });
-        if (res.status === 'success') { await loadData(); showToast('\u2713 Transaksi dihapus!'); }
+        if (res.status === 'success') { await loadData(); showToast('✓ Transaksi dihapus!'); }
         else showToast('Gagal hapus: ' + res.message, true);
     } catch (err) { showToast('Error: ' + err.message, true); }
     finally { hideSaving(); }
