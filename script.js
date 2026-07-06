@@ -1,3 +1,10 @@
+<script>
+// ==============================================
+// AUTH (login sekali + password)
+// ==============================================
+const AUTH_KEY = 'mybudget_unlocked_v1';
+let currentUser = { email: '', isDev: false, registered: false };
+
 // ==============================================
 // CONFIG
 // ==============================================
@@ -28,6 +35,127 @@ const SAV_COLORS     = ['#3b82f6','#2563eb','#1d4ed8','#60a5fa','#93c5fd','#bfdb
 
 const formatRp = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(n) || 0);
 const formatNum = (n) => new Intl.NumberFormat('id-ID').format(Number(n) || 0);
+
+function showSaving(text) {
+    const el = document.getElementById('savingOverlay');
+    if (!el) return;
+    document.getElementById('savingText').textContent = text || 'Menyimpan...';
+    el.classList.add('show');
+}
+function hideSaving() {
+    const el = document.getElementById('savingOverlay');
+    if (el) el.classList.remove('show');
+}
+
+async function apiPost(payload) {
+    const r = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+    });
+    return r.json();
+}
+
+function showAuthModal(mode) {
+    const modal = document.getElementById('authModal');
+    document.getElementById('authEmail').textContent = currentUser.email || '(memuat...)';
+    document.getElementById('authErr').textContent = '';
+    document.getElementById('authPw1').value = '';
+    document.getElementById('authPw2').value = '';
+
+    if (mode === 'register') {
+        document.getElementById('authSubtitle').textContent = 'Buat password untuk akun baru';
+        document.getElementById('pw2Wrap').style.display = 'block';
+        document.getElementById('authBtnText').textContent = 'Daftar & Buat Spreadsheet';
+        document.getElementById('authNote').textContent = 'Spreadsheet baru akan dibuat otomatis di Google Drive kamu.';
+    } else {
+        document.getElementById('authSubtitle').textContent = 'Masukkan password kamu';
+        document.getElementById('pw2Wrap').style.display = 'none';
+        document.getElementById('authBtnText').textContent = 'Masuk';
+        document.getElementById('authNote').textContent = 'Cukup sekali login di device ini.';
+    }
+    modal.classList.remove('hidden');
+    modal.dataset.mode = mode;
+    setTimeout(() => document.getElementById('authPw1').focus(), 100);
+}
+function hideAuthModal() {
+    document.getElementById('authModal').classList.add('hidden');
+}
+
+async function doLogout() {
+    if (!confirm('Keluar dari MyBudget?')) return;
+    try { localStorage.removeItem(AUTH_KEY); } catch(e) {}
+    location.reload();
+}
+
+async function initAuth() {
+    let status;
+    try {
+        const r = await fetch(API_URL + '?action=authStatus');
+        status = await r.json();
+    } catch (err) {
+        alert('Gagal terhubung ke server: ' + err.message + '\n\nPastikan:\n1. URL deployment benar di API_URL\n2. Web app di-deploy dengan "Execute as: User accessing"\n3. Akses: Anyone with Google account');
+        return false;
+    }
+    if (!status || status.status !== 'success' || !status.email) {
+        alert('Tidak bisa membaca akun Google kamu. Pastikan Apps Script di-deploy dengan "Execute as: User accessing".');
+        return false;
+    }
+    currentUser = { email: status.email, isDev: !!status.isDev, registered: !!status.registered };
+
+    if (currentUser.isDev) {
+        try { localStorage.setItem(AUTH_KEY, currentUser.email); } catch(e) {}
+        return true;
+    }
+
+    let unlocked = null;
+    try { unlocked = localStorage.getItem(AUTH_KEY); } catch(e) {}
+    if (unlocked === currentUser.email && currentUser.registered) {
+        return true;
+    }
+
+    showAuthModal(currentUser.registered ? 'login' : 'register');
+    return false;
+}
+
+document.getElementById('authForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const mode = document.getElementById('authModal').dataset.mode;
+    const pw1 = document.getElementById('authPw1').value;
+    const pw2 = document.getElementById('authPw2').value;
+    const errEl = document.getElementById('authErr');
+    const btn = document.getElementById('authBtn');
+    errEl.textContent = '';
+
+    if (pw1.length < 6) { errEl.textContent = 'Password minimal 6 karakter.'; return; }
+    if (mode === 'register' && pw1 !== pw2) { errEl.textContent = 'Konfirmasi password tidak cocok.'; return; }
+
+    btn.disabled = true;
+    const origHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>' +
+        (mode === 'register' ? 'Membuat akun & spreadsheet...' : 'Memverifikasi...') + '</span>';
+    showSaving(mode === 'register' ? 'Membuat spreadsheet baru...' : 'Masuk...');
+
+    try {
+        const res = await apiPost({
+            action: mode === 'register' ? 'register' : 'login',
+            password: pw1
+        });
+        if (res.status !== 'success') {
+            errEl.textContent = res.message || 'Gagal.';
+            return;
+        }
+        try { localStorage.setItem(AUTH_KEY, currentUser.email); } catch(e) {}
+        hideAuthModal();
+        await loadData();
+    } catch (err) {
+        errEl.textContent = 'Error: ' + err.message;
+    } finally {
+        hideSaving();
+        btn.disabled = false;
+        btn.innerHTML = origHTML;
+    }
+});
 
 // ==============================================
 // PAGE NAVIGATION
@@ -62,7 +190,7 @@ function showPage(page) {
 async function loadData() {
     setLoading(true);
     try {
-        const res = await fetch(API_URL);
+        const res = await fetch(API_URL + '?action=getData');
         const result = await res.json();
         if (result.status === 'success') {
             dataTransaksi = result.data || [];
@@ -83,6 +211,14 @@ async function loadData() {
     } finally {
         setLoading(false);
     }
+}
+
+async function refreshData() {
+    const fab = document.getElementById('fabRefresh');
+    fab.classList.add('spinning');
+    await loadData();
+    setTimeout(() => fab.classList.remove('spinning'), 500);
+    showToast('\u2713 Data diperbarui!');
 }
 
 function populateTahunFilter() {
@@ -130,6 +266,22 @@ function ensureBudgetPeriodOptions() {
             `<option value="${i + 1}" ${i + 1 === now.getMonth() + 1 ? 'selected' : ''}>${m}</option>`
         ).join('');
     }
+    if (!yEl.options.length) {
+        const y = now.getFullYear();
+        const years = [];
+        for (let i = y - 3; i <= y + 3; i++) years.push(i);
+        yEl.innerHTML = years.map(v =>
+            `<option value="${v}" ${v === y ? 'selected' : ''}>${v}</option>`
+        ).join('');
+    }
+}
+
+function ensureSetupPeriodOptions() {
+    const bEl = document.getElementById('setupBulan');
+    const yEl = document.getElementById('setupTahun');
+    if (!bEl || !yEl) return;
+    const now = new Date();
+    if (bEl && !bEl.value) bEl.value = String(now.getMonth() + 1);
     if (!yEl.options.length) {
         const y = now.getFullYear();
         const years = [];
@@ -378,6 +530,7 @@ function makeMonthlyBar(filtered) {
 // SETUP
 // ==============================================
 function renderSetup() {
+    ensureSetupPeriodOptions();
     ['Income', 'Expenses', 'Savings'].forEach(j => {
         const el = document.getElementById('setup-' + j.toLowerCase());
         el.innerHTML = (daftarKategori[j] || []).map((kat, idx) => `
@@ -406,26 +559,29 @@ function collectSetup() {
 async function saveSetup() {
     const values = collectSetup();
     daftarKategori = values;
+    const bulan = parseInt(document.getElementById('setupBulan').value) || 0;
+    const tahun = parseInt(document.getElementById('setupTahun').value) || 0;
+    showSaving('Menyimpan kategori...');
     try {
         const r = await fetch(API_URL, {
             method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'updateSetup', ...values })
+            body: JSON.stringify({ action: 'updateSetup', Bulan: bulan, Tahun: tahun, ...values })
         });
         const res = await r.json();
         if (res.status === 'success') {
-            showToast('✓ Kategori tersimpan!');
+            showToast('\u2713 Kategori tersimpan!');
             populateKategoriDropdown(document.getElementById('inputJenis').value);
             renderBudgetPlanning();
         } else {
             showToast('Gagal: ' + res.message, true);
         }
     } catch (err) { showToast('Error: ' + err.message, true); }
+    finally { hideSaving(); }
 }
 
 // ==============================================
 // BUDGET PLANNING
 // ==============================================
-// Hitung aktual per kategori (untuk Income auto-fill dari tracking)
 function getActualByCategory(jenis, bulan, tahun) {
     const map = {};
     dataTransaksi.forEach(i => {
@@ -444,7 +600,6 @@ function renderBudgetPlanning() {
     const info = document.getElementById('budgetPeriodInfo');
     if (info) info.textContent = `Periode: ${MONTHS_SHORT[bulan - 1]} ${tahun}`;
 
-    // === INCOME: auto-fill dari data tracking bulan tsb (read-only) ===
     const incomeActuals = getActualByCategory('Income', bulan, tahun);
     const incomeCats = [...new Set([...(daftarKategori.Income || []), ...Object.keys(incomeActuals)])];
     const totalIncome = incomeCats.reduce((s, k) => s + (incomeActuals[k] || 0), 0);
@@ -454,7 +609,7 @@ function renderBudgetPlanning() {
         <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
             <div style="background:${cInc.bg}; color:white; padding:12px 16px; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600">
                 <i class="fa-solid ${JENIS_ICON.Income}"></i>
-                Income <span style="opacity:0.7; font-weight:400; font-size:11px">(otomatis dari Tracking · ${MONTHS_SHORT[bulan - 1]} ${tahun})</span>
+                Income <span style="opacity:0.7; font-weight:400; font-size:11px">(otomatis dari Tracking \u00b7 ${MONTHS_SHORT[bulan - 1]} ${tahun})</span>
                 <span style="margin-left:auto; font-size:13px; font-weight:700">${formatRp(totalIncome)}</span>
             </div>
             <div style="padding:14px; display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px">
@@ -471,11 +626,10 @@ function renderBudgetPlanning() {
         </div>
     `;
 
-    // === EXPENSES & SAVINGS: editable ===
     ['Expenses', 'Savings'].forEach(jenis => {
         const c = JENIS_COLOR[jenis];
         const cats = daftarKategori[jenis] || [];
-        const label = jenis === 'Savings' ? 'Savings (Tabungan — sisa dari Income setelah Expenses)' : jenis;
+        const label = jenis === 'Savings' ? 'Savings (Tabungan \u2014 sisa dari Income setelah Expenses)' : jenis;
         document.getElementById('budget-' + jenis.toLowerCase()).innerHTML = `
             <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
                 <div style="background:${c.bg}; color:white; padding:12px 16px; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600">
@@ -506,7 +660,6 @@ function renderBudgetPlanning() {
         `;
     });
 
-    // === Ringkasan alokasi ===
     renderBudgetSummary();
 }
 
@@ -531,8 +684,8 @@ function renderBudgetSummary() {
     if (!box) return;
     const okColor = sisa === 0 ? '#16a34a' : (sisa < 0 ? '#dc2626' : '#d97706');
     const status = sisa === 0
-        ? '✓ Income teralokasi penuh'
-        : (sisa < 0 ? `⚠ Over-budget ${formatRp(Math.abs(sisa))}` : `Belum dialokasikan ${formatRp(sisa)}`);
+        ? '\u2713 Income teralokasi penuh'
+        : (sisa < 0 ? `\u26a0 Over-budget ${formatRp(Math.abs(sisa))}` : `Belum dialokasikan ${formatRp(sisa)}`);
     box.innerHTML = `
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px">
             <div><div style="font-size:11px; color:#64748b; font-weight:600">INCOME</div><div style="font-size:15px; font-weight:700; color:#16a34a">${formatRp(totalIncome)}</div></div>
@@ -556,13 +709,11 @@ async function saveBudget() {
 
     const currentPeriod = [];
 
-    // Simpan Income otomatis dari aktual tracking
     const incomeActuals = getActualByCategory('Income', bulan, tahun);
     Object.entries(incomeActuals).forEach(([kat, val]) => {
         currentPeriod.push({ Jenis: 'Income', Kategori: kat, Bulan: bulan, Tahun: tahun, Budget: Number(val) || 0 });
     });
 
-    // Simpan Expenses & Savings dari input
     document.querySelectorAll('#page-budget input[data-jenis]').forEach(inp => {
         const raw = parseInt(inp.dataset.raw || inp.value.replace(/\D/g, '')) || 0;
         currentPeriod.push({
@@ -583,7 +734,7 @@ async function saveBudget() {
         });
         const res = await r.json();
         if (res.status === 'success') {
-            showToast('✓ Budget tersimpan!');
+            showToast('\u2713 Budget tersimpan!');
             renderSisaAnggaran();
         } else {
             showToast('Gagal: ' + res.message, true);
@@ -592,7 +743,7 @@ async function saveBudget() {
 }
 
 // ==============================================
-// SISA ANGGARAN (TRACKING PAGE) — pakai bulan dari tanggal input
+// SISA ANGGARAN (TRACKING PAGE)
 // ==============================================
 function getTrackingPeriod() {
     const dateStr = document.getElementById('inputTanggal')?.value;
@@ -607,7 +758,6 @@ function renderSisaAnggaran() {
     const { bulan, tahun } = getTrackingPeriod();
     const cats = daftarKategori.Expenses || [];
 
-    // Update judul (Bulan Ini -> nama bulan yang dipilih)
     const titleEl = document.getElementById('sisaAnggaranTitle');
     if (titleEl) titleEl.textContent = `Sisa Anggaran Expenses (${MONTHS_FULL[bulan - 1]} ${tahun})`;
 
@@ -638,7 +788,7 @@ function renderSisaAnggaran() {
             <div style="display:flex; justify-content:space-between; margin-bottom:4px">
                 <span style="font-size:12px; font-weight:600; color:#374151">${kat}</span>
                 <span style="font-size:11px; font-weight:700; color:${over ? '#dc2626' : '#16a34a'}">
-                    ${over ? '⚠ -' + formatRp(Math.abs(sisa)) : formatRp(sisa)}
+                    ${over ? '\u26a0 -' + formatRp(Math.abs(sisa)) : formatRp(sisa)}
                 </span>
             </div>
             <div class="pbar">
@@ -650,7 +800,7 @@ function renderSisaAnggaran() {
 }
 
 // ==============================================
-// TABEL TRANSAKSI — Tanggal | Jenis | Kategori | Nominal | Deskripsi | Timestamp | Aksi
+// TABEL TRANSAKSI
 // ==============================================
 function renderTabel(data) {
     const tbody = document.getElementById('tabelBody');
@@ -661,7 +811,7 @@ function renderTabel(data) {
     tbody.innerHTML = [...data].reverse().map(item => {
         const isInc = item.Jenis === 'Income', isSav = item.Jenis === 'Savings';
         const color = isInc ? '#16a34a' : isSav ? '#b45309' : '#dc2626';
-        const op = isInc || isSav ? '+' : '−';
+        const op = isInc || isSav ? '+' : '\u2212';
         const badge = isInc ? 'badge-income' : isSav ? 'badge-savings' : 'badge-expenses';
         return `
         <tr style="border-bottom:1px solid #f1f5f9; font-size:12px; transition:background 0.1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
@@ -708,7 +858,6 @@ document.getElementById('inputJenis').addEventListener('change', function () {
     warnaiJenis(this.value);
 });
 
-// Ubah judul & sisa anggaran ketika tanggal diganti
 document.getElementById('inputTanggal').addEventListener('change', renderSisaAnggaran);
 
 const inputNominal = document.getElementById('inputNominal');
@@ -731,13 +880,12 @@ function terapkanFilter() {
 }
 
 // ==============================================
-// SUBMIT FORM — kirim key kapital agar cocok dgn backend
+// SUBMIT FORM
 // ==============================================
 document.getElementById('formTransaksi').addEventListener('submit', async function (e) {
     e.preventDefault();
     const btn = document.getElementById('btnSubmit');
     const orig = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
     btn.disabled = true;
 
     const id = document.getElementById('inputId').value;
@@ -757,16 +905,17 @@ document.getElementById('formTransaksi').addEventListener('submit', async functi
         return;
     }
 
+    showSaving(id ? 'Memperbarui transaksi...' : 'Menyimpan transaksi...');
     try {
         const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
         const res = await r.json();
         if (res.status === 'success') {
             resetForm();
             await loadData();
-            showToast(id ? '✓ Transaksi diperbarui!' : '✓ Transaksi disimpan!');
+            showToast(id ? '\u2713 Transaksi diperbarui!' : '\u2713 Transaksi disimpan!');
         } else { showToast('Gagal: ' + res.message, true); }
     } catch (err) { showToast('Error: ' + err.message, true); }
-    finally { btn.innerHTML = orig; btn.disabled = false; }
+    finally { hideSaving(); btn.innerHTML = orig; btn.disabled = false; }
 });
 
 // ==============================================
@@ -808,12 +957,14 @@ function resetForm() {
 
 async function hapusTransaksi(id) {
     if (!confirm('Hapus transaksi ini?')) return;
+    showSaving('Menghapus transaksi...');
     try {
         const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'delete', ID: id }) });
         const res = await r.json();
-        if (res.status === 'success') { await loadData(); showToast('✓ Transaksi dihapus!'); }
+        if (res.status === 'success') { await loadData(); showToast('\u2713 Transaksi dihapus!'); }
         else showToast('Gagal hapus: ' + res.message, true);
     } catch (err) { showToast('Error: ' + err.message, true); }
+    finally { hideSaving(); }
 }
 
 // ==============================================
@@ -835,7 +986,6 @@ function showToast(msg, isError = false) {
 // INIT
 // ==============================================
 warnaiJenis('Income');
-// Default tanggal input = hari ini agar sisa anggaran langsung sesuai
 (function initTanggal(){
     const el = document.getElementById('inputTanggal');
     if (el && !el.value) {
@@ -844,4 +994,12 @@ warnaiJenis('Income');
         el.value = iso;
     }
 })();
-loadData();
+
+// ==============================================
+// STARTUP: auth gate lalu load data
+// ==============================================
+(async function startup() {
+    const ok = await initAuth();
+    if (ok) await loadData();
+})();
+</script>
