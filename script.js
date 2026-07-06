@@ -7,7 +7,8 @@ const API_URL = "https://script.google.com/macros/s/AKfycby58S2FMAJvh2tbl3Emu5eK
 // STATE
 // ==============================================
 let dataTransaksi = [];
-let daftarKategori = { Income: [], Expenses: [], Savings: [] };
+// Kategori per periode: { "M-YYYY": { Income:[], Expenses:[], Savings:[] } }
+let kategoriByPeriod = {};
 let dataBudget = [];
 let chartInstances = {};
 
@@ -28,6 +29,82 @@ const SAV_COLORS     = ['#3b82f6','#2563eb','#1d4ed8','#60a5fa','#93c5fd','#bfdb
 
 const formatRp = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(n) || 0);
 const formatNum = (n) => new Intl.NumberFormat('id-ID').format(Number(n) || 0);
+
+// ==============================================
+// KATEGORI PER PERIODE (helper)
+// ==============================================
+// Ambil {Income, Expenses, Savings} untuk periode tsb. Bila kosong, fallback
+// ke periode paling baru (bulan/tahun) yang ≤ periode diminta. Bila tetap
+// tidak ada, fallback ke periode "0-0" (default lama), atau kosong.
+function getKategoriFor(bulan, tahun, opts) {
+    const wantMeta = opts && opts.withMeta;
+    const target = tahun * 100 + bulan;
+    const keys = Object.keys(kategoriByPeriod);
+
+    // exact match
+    const exactKey = bulan + "-" + tahun;
+    if (kategoriByPeriod[exactKey] && hasAnyKategori(kategoriByPeriod[exactKey])) {
+        return wantMeta ? { ...kategoriByPeriod[exactKey], _source: 'exact', _bulan: bulan, _tahun: tahun } : kategoriByPeriod[exactKey];
+    }
+
+    // fallback: latest earlier period
+    let best = null; let bestScore = -1;
+    keys.forEach(k => {
+        const [b, y] = k.split('-').map(Number);
+        if (!b || !y) return;
+        const score = y * 100 + b;
+        if (score <= target && score > bestScore && hasAnyKategori(kategoriByPeriod[k])) {
+            best = k; bestScore = score;
+        }
+    });
+    if (best) {
+        const [bb, yy] = best.split('-').map(Number);
+        return wantMeta ? { ...kategoriByPeriod[best], _source: 'fallback', _bulan: bb, _tahun: yy } : kategoriByPeriod[best];
+    }
+
+    // default row
+    if (kategoriByPeriod['0-0'] && hasAnyKategori(kategoriByPeriod['0-0'])) {
+        return wantMeta ? { ...kategoriByPeriod['0-0'], _source: 'default', _bulan: 0, _tahun: 0 } : kategoriByPeriod['0-0'];
+    }
+
+    // any period (latest overall)
+    let anyBest = null; let anyScore = -1;
+    keys.forEach(k => {
+        const [b, y] = k.split('-').map(Number);
+        if (!b || !y) return;
+        const score = y * 100 + b;
+        if (score > anyScore && hasAnyKategori(kategoriByPeriod[k])) {
+            anyBest = k; anyScore = score;
+        }
+    });
+    if (anyBest) {
+        const [bb, yy] = anyBest.split('-').map(Number);
+        return wantMeta ? { ...kategoriByPeriod[anyBest], _source: 'any', _bulan: bb, _tahun: yy } : kategoriByPeriod[anyBest];
+    }
+
+    const empty = { Income: [], Expenses: [], Savings: [] };
+    return wantMeta ? { ...empty, _source: 'empty', _bulan: 0, _tahun: 0 } : empty;
+}
+function hasAnyKategori(k) {
+    return (k.Income && k.Income.length) || (k.Expenses && k.Expenses.length) || (k.Savings && k.Savings.length);
+}
+
+// Union kategori sepanjang tahun (untuk Total Year di dashboard)
+function getKategoriUnionYear(tahun) {
+    const out = { Income: new Set(), Expenses: new Set(), Savings: new Set() };
+    for (let b = 1; b <= 12; b++) {
+        const k = getKategoriFor(b, tahun);
+        ['Income', 'Expenses', 'Savings'].forEach(j => (k[j] || []).forEach(x => out[j].add(x)));
+    }
+    return { Income: [...out.Income], Expenses: [...out.Expenses], Savings: [...out.Savings] };
+}
+
+function getKategoriForFilter(jenis) {
+    const tahun = parseInt(document.getElementById('filterTahun').value);
+    const bulan = parseInt(document.getElementById('filterBulan').value);
+    if (bulan === 0) return getKategoriUnionYear(tahun)[jenis] || [];
+    return (getKategoriFor(bulan, tahun)[jenis]) || [];
+}
 
 // ==============================================
 // PAGE NAVIGATION
@@ -66,15 +143,20 @@ async function loadData() {
         const result = await res.json();
         if (result.status === 'success') {
             dataTransaksi = result.data || [];
-            if (result.kategori) daftarKategori = result.kategori;
+            if (result.kategoriByPeriod) kategoriByPeriod = result.kategoriByPeriod;
+            else if (result.kategori) {
+                // backward compat: satu bucket saja -> pakai sebagai default
+                kategoriByPeriod = { '0-0': result.kategori };
+            }
             if (result.budget) dataBudget = result.budget;
 
             populateTahunFilter();
+            ensureSetupPeriodOptions();
             renderDashboard();
             renderTabel(dataTransaksi);
             renderSisaAnggaran();
-            populateKategoriDropdown('Income');
-            warnaiJenis('Income');
+            populateKategoriDropdown(document.getElementById('inputJenis').value || 'Income');
+            warnaiJenis(document.getElementById('inputJenis').value || 'Income');
         } else {
             showToast('Gagal memuat: ' + result.message, true);
         }
@@ -82,6 +164,18 @@ async function loadData() {
         showToast('Koneksi error: ' + err.message, true);
     } finally {
         setLoading(false);
+    }
+}
+
+// Refresh via floating button
+async function refreshData() {
+    const fab = document.getElementById('fabRefresh');
+    if (fab) fab.classList.add('spinning');
+    try {
+        await loadData();
+        showToast('✓ Data diperbarui');
+    } finally {
+        if (fab) fab.classList.remove('spinning');
     }
 }
 
@@ -140,6 +234,34 @@ function ensureBudgetPeriodOptions() {
     }
 }
 
+function ensureSetupPeriodOptions() {
+    const bEl = document.getElementById('setupBulan');
+    const yEl = document.getElementById('setupTahun');
+    if (!bEl || !yEl) return;
+    const now = new Date();
+    if (yEl.options.length === 0) {
+        const y = now.getFullYear();
+        const years = [];
+        for (let i = y - 3; i <= y + 3; i++) years.push(i);
+        yEl.innerHTML = years.map(v =>
+            `<option value="${v}" ${v === y ? 'selected' : ''}>${v}</option>`
+        ).join('');
+    }
+    if (!bEl.dataset.init) {
+        bEl.value = String(now.getMonth() + 1);
+        bEl.dataset.init = '1';
+    }
+}
+
+function getSelectedSetupPeriod() {
+    const bEl = document.getElementById('setupBulan');
+    const yEl = document.getElementById('setupTahun');
+    const now = new Date();
+    const bulan = bEl && bEl.value ? parseInt(bEl.value) : (now.getMonth() + 1);
+    const tahun = yEl && yEl.value ? parseInt(yEl.value) : now.getFullYear();
+    return { bulan, tahun };
+}
+
 function getBudgetOf(jenis, kategori, bulan, tahun) {
     const row = dataBudget.find(b =>
         b.Jenis === jenis && b.Kategori === kategori &&
@@ -188,7 +310,7 @@ function renderDashboard() {
 
 function renderBreakdown(jenis, filtered, mult) {
     const c = JENIS_COLOR[jenis];
-    const categories = daftarKategori[jenis] || [];
+    const categories = getKategoriForFilter(jenis);
     const actuals = {};
     filtered.filter(i => i.Jenis === jenis).forEach(i => {
         actuals[i.Kategori] = (actuals[i.Kategori] || 0) + Number(i.Nominal);
@@ -221,30 +343,34 @@ function renderBreakdown(jenis, filtered, mult) {
             <td style="padding:8px 10px; min-width:70px">
                 ${r.budget > 0 ? `<div class="pbar"><div class="pbar-fill" style="width:${Math.min(r.pct,100)}%; background:${r.pct > 100 ? '#dc2626' : c.border}"></div></div>` : ''}
             </td>
-            <td style="padding:8px 10px; text-align:right; color:${r.sisa === 0 && r.budget > 0 ? '#dc2626' : '#16a34a'}">${r.budget > 0 ? formatRp(r.sisa) : '<span style="color:#cbd5e1">-</span>'}</td>
-            ${showExcess ? `<td style="padding:8px 10px; text-align:right; color:#dc2626; font-weight:600">${r.excess > 0 ? formatRp(r.excess) : '<span style="color:#cbd5e1">-</span>'}</td>` : ''}
+            <td style="padding:8px 10px; text-align:right; color:${r.sisa === 0 ? '#94a3b8' : '#16a34a'}">${r.budget > 0 ? formatRp(r.sisa) : '<span style="color:#cbd5e1">-</span>'}</td>
+            ${showExcess ? `<td style="padding:8px 10px; text-align:right; color:${r.excess > 0 ? '#dc2626' : '#94a3b8'}">${r.excess > 0 ? formatRp(r.excess) : '-'}</td>` : ''}
         </tr>
     `).join('');
 
-    document.getElementById('breakdown-' + jenis.toLowerCase()).innerHTML = `
+    const containerId = 'breakdown-' + jenis.toLowerCase();
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = `
         <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
-            <div style="background:${c.bg}; color:white; padding:10px 14px; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600">
-                <i class="fa-solid ${JENIS_ICON[jenis]}"></i> ${jenis}
+            <div style="background:${c.grad}; color:white; padding:12px 16px; display:flex; align-items:center; gap:8px">
+                <i class="fa-solid ${JENIS_ICON[jenis]}"></i>
+                <span style="font-weight:600; font-size:14px">${jenis}</span>
             </div>
             <div style="overflow-x:auto">
-                <table style="width:100%">
+                <table>
                     <thead>
-                        <tr style="background:#f8fafc; color:#64748b; font-size:10px; text-transform:uppercase; letter-spacing:0.05em">
-                            <th style="padding:8px 10px; text-align:left; border-bottom:1px solid #e2e8f0">${jenis}</th>
-                            <th style="padding:8px 10px; text-align:right; border-bottom:1px solid #e2e8f0">Aktual</th>
-                            <th style="padding:8px 10px; text-align:right; border-bottom:1px solid #e2e8f0">Budget</th>
-                            <th style="padding:8px 10px; text-align:right; border-bottom:1px solid #e2e8f0">%</th>
-                            <th style="padding:8px 10px; border-bottom:1px solid #e2e8f0; min-width:70px">Progress</th>
-                            <th style="padding:8px 10px; text-align:right; border-bottom:1px solid #e2e8f0">Sisa</th>
-                            ${showExcess ? '<th style="padding:8px 10px; text-align:right; border-bottom:1px solid #e2e8f0; color:#dc2626">Excess</th>' : ''}
+                        <tr style="background:#f8fafc; color:#64748b; text-transform:uppercase; letter-spacing:0.05em">
+                            <th style="padding:9px 10px; text-align:left; border-bottom:1px solid #e2e8f0">Kategori</th>
+                            <th style="padding:9px 10px; text-align:right; border-bottom:1px solid #e2e8f0">Aktual</th>
+                            <th style="padding:9px 10px; text-align:right; border-bottom:1px solid #e2e8f0">Budget</th>
+                            <th style="padding:9px 10px; text-align:right; border-bottom:1px solid #e2e8f0">%</th>
+                            <th style="padding:9px 10px; text-align:left; border-bottom:1px solid #e2e8f0">Progress</th>
+                            <th style="padding:9px 10px; text-align:right; border-bottom:1px solid #e2e8f0">Sisa</th>
+                            ${showExcess ? '<th style="padding:9px 10px; text-align:right; border-bottom:1px solid #e2e8f0">Over</th>' : ''}
                         </tr>
                     </thead>
-                    <tbody>${rowsHTML}</tbody>
+                    <tbody>${rowsHTML || `<tr><td colspan="${showExcess ? 7 : 6}" style="text-align:center; padding:16px; color:#94a3b8; font-size:12px">Tidak ada data.</td></tr>`}</tbody>
                     <tfoot>
                         <tr style="background:#f8fafc; font-size:12px; font-weight:700; border-top:2px solid #e2e8f0">
                             <td style="padding:9px 10px; color:#0f172a">Total</td>
@@ -375,14 +501,50 @@ function makeMonthlyBar(filtered) {
 }
 
 // ==============================================
-// SETUP
+// SETUP (per Bulan-Tahun)
 // ==============================================
+// Buffer edit untuk periode yang sedang aktif di halaman Setup.
+let setupBuffer = null;      // {Income:[], Expenses:[], Savings:[]}
+let setupBufferKey = null;   // "M-YYYY"
+
+function loadSetupBuffer() {
+    ensureSetupPeriodOptions();
+    const { bulan, tahun } = getSelectedSetupPeriod();
+    const key = bulan + '-' + tahun;
+    if (setupBufferKey === key && setupBuffer) return { bulan, tahun, source: 'buffer' };
+
+    const meta = getKategoriFor(bulan, tahun, { withMeta: true });
+    setupBuffer = {
+        Income: [...(meta.Income || [])],
+        Expenses: [...(meta.Expenses || [])],
+        Savings: [...(meta.Savings || [])]
+    };
+    setupBufferKey = key;
+    return { bulan, tahun, source: meta._source, srcBulan: meta._bulan, srcTahun: meta._tahun };
+}
+
 function renderSetup() {
+    const info = loadSetupBuffer();
+
+    const infoEl = document.getElementById('setupSourceInfo');
+    if (infoEl) {
+        if (info.source === 'exact') {
+            infoEl.innerHTML = `<i class="fa-solid fa-circle-check" style="color:#16a34a"></i> Periode tersimpan`;
+        } else if (info.source === 'fallback' || info.source === 'any') {
+            infoEl.innerHTML = `<i class="fa-solid fa-clone" style="color:#d97706"></i> Menggunakan template dari ${MONTHS_SHORT[info.srcBulan - 1]} ${info.srcTahun} (belum disimpan)`;
+        } else if (info.source === 'default') {
+            infoEl.innerHTML = `<i class="fa-solid fa-clone" style="color:#d97706"></i> Menggunakan kategori default`;
+        } else {
+            infoEl.innerHTML = `<i class="fa-solid fa-circle-info" style="color:#64748b"></i> Belum ada kategori`;
+        }
+    }
+
     ['Income', 'Expenses', 'Savings'].forEach(j => {
         const el = document.getElementById('setup-' + j.toLowerCase());
-        el.innerHTML = (daftarKategori[j] || []).map((kat, idx) => `
+        el.innerHTML = (setupBuffer[j] || []).map((kat, idx) => `
             <div style="display:flex; align-items:center; gap:6px">
-                <input type="text" value="${kat}" data-jenis="${j}" data-idx="${idx}"
+                <input type="text" value="${escapeAttr(kat)}" data-jenis="${j}" data-idx="${idx}"
+                    oninput="onSetupInput(this)"
                     style="flex:1; border:1px solid #e2e8f0; padding:6px 10px; border-radius:6px; font-size:13px; outline:none">
                 <button onclick="removeKategori('${j}', ${idx})" style="background:#fef2f2; color:#dc2626; border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:11px">
                     <i class="fa-solid fa-trash"></i>
@@ -391,31 +553,58 @@ function renderSetup() {
         `).join('');
     });
 }
-function addKategori(j) { (daftarKategori[j] = daftarKategori[j] || []).push(''); renderSetup(); }
-function removeKategori(j, idx) { daftarKategori[j].splice(idx, 1); renderSetup(); }
+
+function escapeAttr(s) { return String(s).replace(/"/g, '&quot;'); }
+
+function onSetupInput(inp) {
+    const j = inp.dataset.jenis;
+    const idx = parseInt(inp.dataset.idx);
+    if (!setupBuffer[j]) setupBuffer[j] = [];
+    setupBuffer[j][idx] = inp.value;
+}
+
+function addKategori(j) {
+    if (!setupBuffer) loadSetupBuffer();
+    (setupBuffer[j] = setupBuffer[j] || []).push('');
+    renderSetup();
+}
+function removeKategori(j, idx) {
+    if (!setupBuffer) loadSetupBuffer();
+    setupBuffer[j].splice(idx, 1);
+    renderSetup();
+}
+
 function collectSetup() {
     const out = { Income: [], Expenses: [], Savings: [] };
     ['Income', 'Expenses', 'Savings'].forEach(j => {
-        document.querySelectorAll(`#setup-${j.toLowerCase()} input`).forEach(inp => {
-            const v = inp.value.trim();
-            if (v) out[j].push(v);
+        (setupBuffer && setupBuffer[j] ? setupBuffer[j] : []).forEach(v => {
+            const s = String(v || '').trim();
+            if (s) out[j].push(s);
         });
     });
     return out;
 }
+
 async function saveSetup() {
+    const { bulan, tahun } = getSelectedSetupPeriod();
     const values = collectSetup();
-    daftarKategori = values;
     try {
         const r = await fetch(API_URL, {
             method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'updateSetup', ...values })
+            body: JSON.stringify({ action: 'updateSetup', Bulan: bulan, Tahun: tahun, ...values })
         });
         const res = await r.json();
         if (res.status === 'success') {
-            showToast('✓ Kategori tersimpan!');
+            // Update state lokal
+            const key = bulan + '-' + tahun;
+            kategoriByPeriod[key] = values;
+            setupBuffer = { Income: [...values.Income], Expenses: [...values.Expenses], Savings: [...values.Savings] };
+            setupBufferKey = key;
+            showToast(`✓ Kategori ${MONTHS_SHORT[bulan - 1]} ${tahun} tersimpan!`);
+            renderSetup();
             populateKategoriDropdown(document.getElementById('inputJenis').value);
             renderBudgetPlanning();
+            renderSisaAnggaran();
         } else {
             showToast('Gagal: ' + res.message, true);
         }
@@ -425,7 +614,6 @@ async function saveSetup() {
 // ==============================================
 // BUDGET PLANNING
 // ==============================================
-// Hitung aktual per kategori (untuk Income auto-fill dari tracking)
 function getActualByCategory(jenis, bulan, tahun) {
     const map = {};
     dataTransaksi.forEach(i => {
@@ -444,56 +632,62 @@ function renderBudgetPlanning() {
     const info = document.getElementById('budgetPeriodInfo');
     if (info) info.textContent = `Periode: ${MONTHS_SHORT[bulan - 1]} ${tahun}`;
 
-    // === INCOME: auto-fill dari data tracking bulan tsb (read-only) ===
+    const kat = getKategoriFor(bulan, tahun);
+
+    // === INCOME auto-fill dari aktual tracking bulan tsb (read-only) ===
     const incomeActuals = getActualByCategory('Income', bulan, tahun);
-    const incomeCats = [...new Set([...(daftarKategori.Income || []), ...Object.keys(incomeActuals)])];
+    const incomeCats = [...new Set([...(kat.Income || []), ...Object.keys(incomeActuals)])];
     const totalIncome = incomeCats.reduce((s, k) => s + (incomeActuals[k] || 0), 0);
 
     const cInc = JENIS_COLOR.Income;
     document.getElementById('budget-income').innerHTML = `
         <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
-            <div style="background:${cInc.bg}; color:white; padding:12px 16px; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600">
-                <i class="fa-solid ${JENIS_ICON.Income}"></i>
-                Income <span style="opacity:0.7; font-weight:400; font-size:11px">(otomatis dari Tracking · ${MONTHS_SHORT[bulan - 1]} ${tahun})</span>
-                <span style="margin-left:auto; font-size:13px; font-weight:700">${formatRp(totalIncome)}</span>
+            <div style="background:${cInc.bg}; color:white; padding:12px 14px; display:flex; align-items:center; justify-content:space-between">
+                <span style="font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px">
+                    <i class="fa-solid fa-arrow-trend-up"></i> Income (auto)
+                </span>
+                <span style="font-size:12px; opacity:0.85">${MONTHS_SHORT[bulan - 1]} ${tahun}</span>
             </div>
-            <div style="padding:14px; display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px">
-                ${incomeCats.length ? incomeCats.map(kat => {
-                    const val = incomeActuals[kat] || 0;
-                    return `
-                    <div>
-                        <label style="font-size:11px; font-weight:600; color:#64748b; display:block; margin-bottom:5px">${kat}</label>
-                        <input type="text" readonly value="${val > 0 ? formatNum(val) : '0'}"
-                            style="width:100%; border:1px solid #e2e8f0; padding:8px 10px; border-radius:8px; font-size:13px; box-sizing:border-box; background:#f1f5f9; color:#0f172a; font-weight:600">
-                    </div>`;
-                }).join('') : '<p style="color:#94a3b8; font-size:13px; grid-column:1/-1">Belum ada income tercatat di bulan ini. Input dulu di halaman Tracking.</p>'}
+            <div style="padding:12px 14px">
+                ${incomeCats.length === 0
+                    ? '<p style="color:#94a3b8; font-size:13px; margin:0">Belum ada data income di bulan ini.</p>'
+                    : incomeCats.map(k => `
+                        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #f1f5f9; font-size:13px">
+                            <span style="color:#374151">${k}</span>
+                            <span style="font-weight:600; color:${cInc.text}">${formatRp(incomeActuals[k] || 0)}</span>
+                        </div>`).join('')
+                }
+                <div style="display:flex; justify-content:space-between; padding-top:10px; margin-top:6px; border-top:2px solid #e2e8f0; font-size:13px; font-weight:700">
+                    <span>Total Income</span>
+                    <span id="total-income" style="color:${cInc.text}">${formatRp(totalIncome)}</span>
+                </div>
             </div>
         </div>
     `;
 
-    // === EXPENSES & SAVINGS: editable ===
+    // === EXPENSES & SAVINGS: input manual ===
     ['Expenses', 'Savings'].forEach(jenis => {
+        const cats = kat[jenis] || [];
         const c = JENIS_COLOR[jenis];
-        const cats = daftarKategori[jenis] || [];
-        const label = jenis === 'Savings' ? 'Savings (Tabungan — sisa dari Income setelah Expenses)' : jenis;
-        document.getElementById('budget-' + jenis.toLowerCase()).innerHTML = `
+        const el = document.getElementById('budget-' + jenis.toLowerCase());
+        el.innerHTML = `
             <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
-                <div style="background:${c.bg}; color:white; padding:12px 16px; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600">
-                    <i class="fa-solid ${JENIS_ICON[jenis]}"></i>
-                    ${label}
-                    <span style="opacity:0.7; font-weight:400; font-size:11px; margin-left:4px">(${MONTHS_SHORT[bulan - 1]} ${tahun})</span>
-                    <span id="total-${jenis.toLowerCase()}" style="margin-left:auto; font-size:13px; font-weight:700"></span>
+                <div style="background:${c.bg}; color:white; padding:12px 14px; display:flex; align-items:center; justify-content:space-between">
+                    <span style="font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px">
+                        <i class="fa-solid ${JENIS_ICON[jenis]}"></i> ${jenis}
+                    </span>
+                    <span id="total-${jenis.toLowerCase()}" style="font-size:12px; font-weight:600">${formatRp(0)}</span>
                 </div>
-                <div style="padding:14px; display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px">
-                    ${cats.map(kat => {
-                        const val = getBudgetOf(jenis, kat, bulan, tahun);
+                <div style="padding:12px 14px; display:grid; gap:8px">
+                    ${cats.map(k => {
+                        const val = getBudgetOf(jenis, k, bulan, tahun);
                         return `
                         <div>
-                            <label style="font-size:11px; font-weight:600; color:#64748b; display:block; margin-bottom:5px">${kat}</label>
-                            <input type="text"
-                                data-jenis="${jenis}" data-kategori="${kat}"
-                                data-bulan="${bulan}" data-tahun="${tahun}"
-                                value="${val > 0 ? formatNum(val) : ''}"
+                            <label style="font-size:11px; font-weight:600; color:#64748b; display:block; margin-bottom:3px">${k}</label>
+                            <input type="text" inputmode="numeric"
+                                data-jenis="${jenis}" data-kategori="${escapeAttr(k)}"
+                                data-raw="${val}"
+                                value="${val ? formatNum(val) : ''}"
                                 placeholder="0"
                                 oninput="onBudgetInput(this)"
                                 onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e2e8f0'"
@@ -506,7 +700,6 @@ function renderBudgetPlanning() {
         `;
     });
 
-    // === Ringkasan alokasi ===
     renderBudgetSummary();
 }
 
@@ -553,16 +746,13 @@ function onBudgetInput(el) {
 
 async function saveBudget() {
     const { bulan, tahun } = getSelectedBudgetPeriod();
-
     const currentPeriod = [];
 
-    // Simpan Income otomatis dari aktual tracking
     const incomeActuals = getActualByCategory('Income', bulan, tahun);
     Object.entries(incomeActuals).forEach(([kat, val]) => {
         currentPeriod.push({ Jenis: 'Income', Kategori: kat, Bulan: bulan, Tahun: tahun, Budget: Number(val) || 0 });
     });
 
-    // Simpan Expenses & Savings dari input
     document.querySelectorAll('#page-budget input[data-jenis]').forEach(inp => {
         const raw = parseInt(inp.dataset.raw || inp.value.replace(/\D/g, '')) || 0;
         currentPeriod.push({
@@ -605,11 +795,10 @@ function renderSisaAnggaran() {
     const container = document.getElementById('sisaAnggaran');
     if (!container) return;
     const { bulan, tahun } = getTrackingPeriod();
-    const cats = daftarKategori.Expenses || [];
+    const cats = getKategoriFor(bulan, tahun).Expenses || [];
 
-    // Update judul (Bulan Ini -> nama bulan yang dipilih)
     const titleEl = document.getElementById('sisaAnggaranTitle');
-    if (titleEl) titleEl.textContent = `Sisa Anggaran Expenses (${MONTHS_FULL[bulan - 1]} ${tahun})`;
+    if (titleEl) titleEl.innerHTML = `<i class="fa-solid fa-gauge" style="color:#991b1b; font-size:12px"></i> Sisa Anggaran Expenses (${MONTHS_FULL[bulan - 1]} ${tahun})`;
 
     const actuals = {};
     dataTransaksi.filter(i => {
@@ -619,7 +808,7 @@ function renderSisaAnggaran() {
     }).forEach(i => { actuals[i.Kategori] = (actuals[i.Kategori] || 0) + Number(i.Nominal); });
 
     if (!cats.length) {
-        container.innerHTML = '<p style="color:#94a3b8; font-size:13px">Belum ada kategori Expenses di Setup.</p>';
+        container.innerHTML = '<p style="color:#94a3b8; font-size:13px">Belum ada kategori Expenses untuk periode ini. Atur di halaman Setup.</p>';
         return;
     }
 
@@ -650,7 +839,7 @@ function renderSisaAnggaran() {
 }
 
 // ==============================================
-// TABEL TRANSAKSI — Tanggal | Jenis | Kategori | Nominal | Deskripsi | Timestamp | Aksi
+// TABEL TRANSAKSI
 // ==============================================
 function renderTabel(data) {
     const tbody = document.getElementById('tabelBody');
@@ -689,10 +878,11 @@ function renderTabel(data) {
 // FORM INPUT TRANSAKSI
 // ==============================================
 function populateKategoriDropdown(jenis, selected) {
+    const { bulan, tahun } = getTrackingPeriod();
+    const cats = (getKategoriFor(bulan, tahun)[jenis]) || [];
     const sel = document.getElementById('inputKategori');
-    const list = daftarKategori[jenis] || [];
     sel.innerHTML = '<option value="">-- Pilih Kategori --</option>' +
-        list.map(k => `<option value="${k}" ${k === selected ? 'selected' : ''}>${k}</option>`).join('');
+        cats.map(k => `<option value="${escapeAttr(k)}" ${k === selected ? 'selected' : ''}>${k}</option>`).join('');
 }
 
 function warnaiJenis(jenis) {
@@ -708,8 +898,11 @@ document.getElementById('inputJenis').addEventListener('change', function () {
     warnaiJenis(this.value);
 });
 
-// Ubah judul & sisa anggaran ketika tanggal diganti
-document.getElementById('inputTanggal').addEventListener('change', renderSisaAnggaran);
+document.getElementById('inputTanggal').addEventListener('change', function () {
+    // Bulan berubah -> kategori bisa berbeda -> refresh dropdown & sisa anggaran.
+    populateKategoriDropdown(document.getElementById('inputJenis').value);
+    renderSisaAnggaran();
+});
 
 const inputNominal = document.getElementById('inputNominal');
 inputNominal.addEventListener('input', function () {
@@ -731,7 +924,7 @@ function terapkanFilter() {
 }
 
 // ==============================================
-// SUBMIT FORM — kirim key kapital agar cocok dgn backend
+// SUBMIT FORM
 // ==============================================
 document.getElementById('formTransaksi').addEventListener('submit', async function (e) {
     e.preventDefault();
@@ -797,6 +990,10 @@ function resetForm() {
     document.getElementById('formTransaksi').reset();
     document.getElementById('inputId').value = '';
     inputNominal.dataset.raw = '';
+    // Default tanggal hari ini
+    const d = new Date();
+    document.getElementById('inputTanggal').value =
+        d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     populateKategoriDropdown(document.getElementById('inputJenis').value);
     warnaiJenis(document.getElementById('inputJenis').value);
     const btn = document.getElementById('btnSubmit');
@@ -815,6 +1012,14 @@ async function hapusTransaksi(id) {
         else showToast('Gagal hapus: ' + res.message, true);
     } catch (err) { showToast('Error: ' + err.message, true); }
 }
+
+// Ketika periode setup berubah, buffer harus di-reset supaya reload dari state.
+document.addEventListener('change', function (e) {
+    if (e.target && (e.target.id === 'setupBulan' || e.target.id === 'setupTahun')) {
+        setupBuffer = null;
+        setupBufferKey = null;
+    }
+});
 
 // ==============================================
 // UTILS
@@ -835,13 +1040,11 @@ function showToast(msg, isError = false) {
 // INIT
 // ==============================================
 warnaiJenis('Income');
-// Default tanggal input = hari ini agar sisa anggaran langsung sesuai
 (function initTanggal(){
     const el = document.getElementById('inputTanggal');
     if (el && !el.value) {
         const d = new Date();
-        const iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-        el.value = iso;
+        el.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     }
 })();
 loadData();
