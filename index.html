@@ -46,6 +46,13 @@
         .badge-income { background: #dcfce7; color: #166534; }
         .badge-expenses { background: #fee2e2; color: #991b1b; }
         .badge-savings { background: #dbeafe; color: #1e40af; }
+        #fabRefresh { position: fixed; right: 18px; bottom: 88px; width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg,#38bdf8,#2563eb); color:white; border:none; box-shadow: 0 8px 24px rgba(37,99,235,0.45); font-size:20px; cursor:pointer; z-index:50; display:flex; align-items:center; justify-content:center; transition: transform 0.15s, box-shadow 0.15s; }
+        #fabRefresh:hover { transform: scale(1.08); box-shadow: 0 10px 28px rgba(37,99,235,0.55); }
+        #fabRefresh:active { transform: scale(0.95); }
+        #fabRefresh.spinning i { animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (min-width: 768px) { #fabRefresh { bottom: 24px; } }
+
     </style>
 </head>
 <body>
@@ -196,13 +203,33 @@
 
         <!-- ============ PAGE: SETUP ============ -->
         <div id="page-setup" class="page" style="padding:16px">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:8px">
                 <h2 style="font-size:18px; font-weight:700; color:#0f172a; margin:0">Setup Kategori</h2>
                 <button onclick="saveSetup()" style="background:#2563eb; color:white; border:none; padding:9px 18px; border-radius:9px; font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px">
                     <i class="fa-solid fa-floppy-disk"></i> Simpan
                 </button>
             </div>
-            <p style="color:#64748b; font-size:13px; margin:0 0 16px">Tambah, edit, atau hapus kategori untuk masing-masing jenis transaksi. Klik Simpan untuk menyinkronkan ke Google Sheets.</p>
+            <p style="color:#64748b; font-size:13px; margin:0 0 12px">Pilih <strong>Bulan</strong> &amp; <strong>Tahun</strong> dulu, lalu atur kategori untuk periode tersebut. Bila periode kosong, kategori otomatis mengikuti periode terakhir yang pernah diisi.</p>
+
+            <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center">
+                <div style="display:flex; flex-direction:column; gap:4px">
+                    <label style="font-size:11px; font-weight:600; color:#64748b">Bulan</label>
+                    <select id="setupBulan" onchange="renderSetup()" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:7px; font-size:13px; font-weight:600; outline:none; cursor:pointer">
+                        <option value="1">Januari</option><option value="2">Februari</option>
+                        <option value="3">Maret</option><option value="4">April</option>
+                        <option value="5">Mei</option><option value="6">Juni</option>
+                        <option value="7">Juli</option><option value="8">Agustus</option>
+                        <option value="9">September</option><option value="10">Oktober</option>
+                        <option value="11">November</option><option value="12">Desember</option>
+                    </select>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px">
+                    <label style="font-size:11px; font-weight:600; color:#64748b">Tahun</label>
+                    <select id="setupTahun" onchange="renderSetup()" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:7px; font-size:13px; font-weight:600; outline:none; cursor:pointer"></select>
+                </div>
+                <div id="setupSourceInfo" style="font-size:11px; color:#64748b; margin-left:auto"></div>
+            </div>
+
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px">
                 <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
                     <div style="background:#15803d; color:white; padding:12px 16px; display:flex; align-items:center; justify-content:space-between">
@@ -364,6 +391,11 @@
 
     </main>
 </div>
+
+
+<button id="fabRefresh" onclick="refreshData()" title="Refresh data" aria-label="Refresh">
+    <i class="fa-solid fa-arrows-rotate"></i>
+</button>
 
 <nav class="sidebar-bg" id="mobile-nav" style="position:fixed; bottom:0; left:0; right:0; display:flex; z-index:40; border-top:1px solid rgba(255,255,255,0.08); box-shadow:0 -4px 20px rgba(0,0,0,0.3)">
     <button class="mob-btn active" data-page="dashboard" onclick="showPage('dashboard')">
