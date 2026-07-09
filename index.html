@@ -164,13 +164,15 @@
 
     <main id="main-content" style="flex:1; overflow-y:auto; padding-bottom:72px">
 
-        <header class="sidebar-bg" id="mobile-header" style="display:flex; align-items:center; gap:12px; padding:14px 16px; position:sticky; top:0; z-index:30; box-shadow:0 2px 8px rgba(0,0,0,0.3)">
-            <div style="width:28px; height:28px; background:linear-gradient(135deg,#38bdf8,#2563eb); border-radius:7px; display:flex; align-items:center; justify-content:center">
-                <i class="fa-solid fa-wallet" style="color:white; font-size:12px"></i>
+        <header class="sidebar-bg" id="mobile-header" style="display:flex; align-items:center; gap:10px; padding:12px 14px; z-index:30; box-shadow:0 2px 8px rgba(0,0,0,0.3)">
+            <div style="width:30px; height:30px; background:linear-gradient(135deg,#38bdf8,#2563eb); border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0">
+                <i class="fa-solid fa-wallet" style="color:white; font-size:13px"></i>
             </div>
             <span style="color:white; font-weight:700; font-size:15px">MyBudget</span>
-            <span id="mobilePageTitle" style="color:#64748b; font-size:12px; margin-left:auto">Dashboard</span>
-            <button onclick="doLogout()" style="background:transparent;border:none;color:#94a3b8;cursor:pointer;padding:4px 6px" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+            <span id="mobilePageTitle" style="color:#64748b; font-size:12px; margin-left:auto; margin-right:6px">Dashboard</span>
+            <button id="headerRefresh" class="hdr-btn" title="Refresh data" aria-label="Refresh"><i class="fa-solid fa-arrows-rotate"></i></button>
+            <button id="darkToggle" class="dark-toggle" title="Toggle dark mode" aria-label="Toggle dark mode"><span class="knob"><i class="fa-solid fa-sun"></i></span></button>
+            <button onclick="doLogout()" class="hdr-btn" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
         </header>
 
         <!-- ============ PAGE: DASHBOARD ============ -->
@@ -484,9 +486,42 @@ function applyLayout() {
     document.getElementById('mobile-nav').style.display = isDesktop ? 'none' : 'flex';
     document.getElementById('main-content').style.marginLeft = isDesktop ? '220px' : '0';
     document.getElementById('main-content').style.paddingBottom = isDesktop ? '0' : '72px';
+    document.body.classList.toggle('has-mobile-header', !isDesktop);
 }
 applyLayout();
 window.addEventListener('resize', applyLayout);
+
+// ===== Header refresh button =====
+(function(){
+    const btn = document.getElementById('headerRefresh');
+    if(!btn) return;
+    btn.addEventListener('click', function(){
+        btn.classList.add('spinning');
+        try { if (typeof refreshData === 'function') refreshData(); } catch(e){ console.error(e); }
+        setTimeout(function(){ btn.classList.remove('spinning'); }, 900);
+    });
+})();
+
+// ===== Dark mode toggle =====
+(function(){
+    const KEY = 'mb_dark_mode';
+    const btn = document.getElementById('darkToggle');
+    const icon = btn ? btn.querySelector('i') : null;
+    function apply(on){
+        document.body.classList.toggle('dark', !!on);
+        if(icon){ icon.className = on ? 'fa-solid fa-moon' : 'fa-solid fa-sun'; }
+    }
+    let saved = false;
+    try { saved = localStorage.getItem(KEY) === '1'; } catch(e){}
+    apply(saved);
+    if(btn){
+        btn.addEventListener('click', function(){
+            const on = !document.body.classList.contains('dark');
+            apply(on);
+            try { localStorage.setItem(KEY, on ? '1' : '0'); } catch(e){}
+        });
+    }
+})();
 </script>
 
 <script>
