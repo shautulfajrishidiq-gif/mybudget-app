@@ -17,6 +17,7 @@ let dataTransaksi = [];
 let daftarKategori = { Income: [], Expenses: [], Savings: [] }; // aggregate fallback
 let kategoriByPeriod = {}; // { "bulan-tahun": { Income:[], Expenses:[], Savings:[] } }
 let setupDraft = { Income: [], Expenses: [], Savings: [] };     // editing buffer for Setup page
+let setupEditMode = false; // true = user explicitly unlocked a saved period for editing
 let dataBudget = [];
 let chartInstances = {};
 
@@ -43,6 +44,17 @@ function kategoriForPeriod(bulan, tahun) {
 }
 
 function isPeriodSaved(bulan, tahun) { return !!kategoriByPeriod[periodKey(bulan, tahun)]; }
+
+function findNearestSavedPeriod(bulan, tahun) {
+    const keys = Object.keys(kategoriByPeriod);
+    if (!keys.length) return null;
+    const arr = keys.map(k => {
+        const p = k.split('-'); return { k, b: Number(p[0]), y: Number(p[1]) };
+    }).sort((a, b) => (b.y - a.y) || (b.b - a.b));
+    const target = tahun * 100 + bulan;
+    const notFuture = arr.filter(x => (x.y * 100 + x.b) <= target);
+    return (notFuture[0] || arr[0]).k;
+}
 
 function kategoriForFilter(jenis) {
     const tahun = parseInt(document.getElementById('filterTahun').value);
@@ -386,14 +398,18 @@ function ensureSetupPeriodOptions() {
     if (!bEl || !yEl) return;
     const now = new Date();
     if (bEl && !bEl.value) bEl.value = String(now.getMonth() + 1);
-    if (!yEl.options.length) {
-        const y = now.getFullYear();
-        const years = [];
-        for (let i = y - 3; i <= y + 3; i++) years.push(i);
-        yEl.innerHTML = years.map(v =>
-            `<option value="${v}" ${v === y ? 'selected' : ''}>${v}</option>`
-        ).join('');
-    }
+    // Rebuild year options to include saved periods
+    const y = now.getFullYear();
+    const yearSet = new Set([y]);
+    for (let i = y - 3; i <= y + 3; i++) yearSet.add(i);
+    Object.keys(kategoriByPeriod).forEach(k => {
+        const p = k.split('-'); yearSet.add(Number(p[1]));
+    });
+    const years = [...yearSet].sort((a, b) => b - a);
+    const currentVal = yEl.value || String(y);
+    yEl.innerHTML = years.map(v =>
+        `<option value="${v}" ${v === Number(currentVal) ? 'selected' : ''}>${v}</option>`
+    ).join('');
 }
 
 function getBudgetOf(jenis, kategori, bulan, tahun) {
@@ -601,22 +617,70 @@ function renderSetup() {
     const tahun = parseInt(document.getElementById('setupTahun').value) || 0;
     const key = periodKey(bulan, tahun);
     const saved = !!kategoriByPeriod[key];
-    const src = kategoriForPeriod(bulan, tahun) || { Income: [], Expenses: [], Savings: [] };
-    // Draft: kalau periode ini sudah pernah disimpan, tampilkan persis apa yang tersimpan.
-    // Kalau belum, isi dengan fallback (periode tersimpan terdekat) sebagai default awal.
-    setupDraft = {
-        Income:   Array.isArray(src.Income)   ? src.Income.slice()   : [],
-        Expenses: Array.isArray(src.Expenses) ? src.Expenses.slice() : [],
-        Savings:  Array.isArray(src.Savings)  ? src.Savings.slice()  : []
-    };
+    const isLocked = saved && !setupEditMode;
+
+    // Only reload setupDraft from saved data when NOT in edit mode
+    if (!setupEditMode) {
+        const src = saved ? kategoriByPeriod[key] : { Income: [], Expenses: [], Savings: [] };
+        setupDraft = {
+            Income:   Array.isArray(src.Income)   ? src.Income.slice()   : [],
+            Expenses: Array.isArray(src.Expenses) ? src.Expenses.slice() : [],
+            Savings:  Array.isArray(src.Savings)  ? src.Savings.slice()  : []
+        };
+    }
+
+    // Update info text
     const infoEl = document.getElementById('setupSourceInfo');
     if (infoEl) {
-        if (saved) {
-            infoEl.innerHTML = '<span style="color:#16a34a; font-weight:600"><i class="fa-solid fa-circle-check"></i> Tersimpan untuk ' + MONTHS_FULL[bulan - 1] + ' ' + tahun + '</span>';
+        if (saved && isLocked) {
+            infoEl.innerHTML = '<span style="color:#16a34a; font-weight:600"><i class="fa-solid fa-lock"></i> Terkunci \u2014 ' + MONTHS_FULL[bulan - 1] + ' ' + tahun + '</span>';
+        } else if (saved && !isLocked) {
+            infoEl.innerHTML = '<span style="color:#d97706; font-weight:600"><i class="fa-solid fa-lock-open"></i> Sedang diedit \u2014 ' + MONTHS_FULL[bulan - 1] + ' ' + tahun + '</span>';
         } else {
-            infoEl.innerHTML = '<span style="color:#d97706; font-weight:600"><i class="fa-solid fa-circle-exclamation"></i> Default (belum disimpan untuk ' + MONTHS_FULL[bulan - 1] + ' ' + tahun + ')</span>';
+            infoEl.innerHTML = '<span style="color:#d97706; font-weight:600"><i class="fa-solid fa-circle-exclamation"></i> Belum disimpan \u2014 ' + MONTHS_FULL[bulan - 1] + ' ' + tahun + '</span>';
         }
     }
+
+    // Update Save & Lock buttons
+    const saveBtn = document.getElementById('btnSaveSetup');
+    const lockBtn = document.getElementById('btnLockSetup');
+    const copyWrap = document.getElementById('copySetupWrap');
+
+    if (saved) {
+        if (saveBtn) saveBtn.style.display = 'flex';
+        if (lockBtn) {
+            lockBtn.style.display = 'flex';
+            if (isLocked) {
+                lockBtn.innerHTML = '<i class="fa-solid fa-lock-open"></i><span>Edit</span>';
+                lockBtn.style.background = '#d97706';
+            } else {
+                lockBtn.innerHTML = '<i class="fa-solid fa-lock"></i><span>Kunci</span>';
+                lockBtn.style.background = '#16a34a';
+            }
+        }
+        if (copyWrap) copyWrap.style.display = 'none';
+    } else {
+        if (saveBtn) saveBtn.style.display = 'flex';
+        if (lockBtn) lockBtn.style.display = 'none';
+        if (copyWrap) {
+            const savedKeys = Object.keys(kategoriByPeriod);
+            if (savedKeys.length > 0) {
+                copyWrap.style.display = 'flex';
+                const sel = copyWrap.querySelector('select');
+                if (sel) {
+                    sel.innerHTML = '<option value="">Salin dari...</option>' +
+                        savedKeys.map(k => {
+                            const [b, y] = k.split('-');
+                            return '<option value="' + k + '">' + MONTHS_FULL[parseInt(b)-1] + ' ' + y + '</option>';
+                        }).join('');
+                }
+            } else {
+                copyWrap.style.display = 'none';
+            }
+        }
+    }
+
+    // ALWAYS render editable inputs with + and trash buttons (same as original code)
     ['Income', 'Expenses', 'Savings'].forEach(j => {
         const el = document.getElementById('setup-' + j.toLowerCase());
         if (!el) return;
@@ -629,11 +693,56 @@ function renderSetup() {
                 </button>
             </div>
         `).join('');
+        if (!setupDraft[j] || setupDraft[j].length === 0) {
+            el.innerHTML = '<p style="color:#94a3b8; font-size:11px; padding:4px 0">Belum ada kategori. Klik + untuk menambah.</p>';
+        }
     });
 }
+
 function onSetupInput(j, idx, val) { if (!setupDraft[j]) setupDraft[j] = []; setupDraft[j][idx] = val; }
-function addKategori(j) { (setupDraft[j] = setupDraft[j] || []).push(''); renderSetup(); }
-function removeKategori(j, idx) { setupDraft[j].splice(idx, 1); renderSetup(); }
+function addKategori(j) {
+    // Auto-unlock if period is locked
+    if (!setupEditMode) { setupEditMode = true; }
+    (setupDraft[j] = setupDraft[j] || []).push('');
+    renderSetup();
+}
+function removeKategori(j, idx) {
+    // Auto-unlock if period is locked
+    if (!setupEditMode) { setupEditMode = true; }
+    setupDraft[j].splice(idx, 1);
+    renderSetup();
+}
+function toggleLockSetup() { setupEditMode = !setupEditMode; renderSetup(); }
+function copySetupFrom() {
+    const sel = document.querySelector('#copySetupWrap select');
+    if (!sel || !sel.value) return;
+    const key = sel.value;
+    const src = kategoriByPeriod[key];
+    if (!src) return;
+    setupDraft = {
+        Income:   (src.Income || []).slice(),
+        Expenses: (src.Expenses || []).slice(),
+        Savings:  (src.Savings || []).slice()
+    };
+    // Re-render only the input fields (not the full renderSetup which would reset draft)
+    ['Income', 'Expenses', 'Savings'].forEach(j => {
+        const el = document.getElementById('setup-' + j.toLowerCase());
+        if (!el) return;
+        el.innerHTML = (setupDraft[j] || []).map((kat, idx) => `
+            <div style="display:flex; align-items:center; gap:6px">
+                <input type="text" value="${String(kat).replace(/"/g, '&quot;')}" data-jenis="${j}" data-idx="${idx}" oninput="onSetupInput('${j}', ${idx}, this.value)"
+                    style="flex:1; border:1px solid #e2e8f0; padding:6px 10px; border-radius:6px; font-size:13px; outline:none">
+                <button onclick="removeKategori('${j}', ${idx})" style="background:#fef2f2; color:#dc2626; border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:11px">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+        `).join('');
+        if (!setupDraft[j] || setupDraft[j].length === 0) {
+            el.innerHTML = '<p style="color:#94a3b8; font-size:11px; padding:4px 0">Belum ada kategori. Klik + untuk menambah.</p>';
+        }
+    });
+    showToast('\\u2713 Kategori disalin dari ' + key.replace('-', '/'));
+}
 function collectSetup() {
     const out = { Income: [], Expenses: [], Savings: [] };
     ['Income', 'Expenses', 'Savings'].forEach(j => {
@@ -660,7 +769,8 @@ async function saveSetup() {
                 Savings: values.Savings.slice()
             };
             daftarKategori = aggregateKategori(kategoriByPeriod);
-            showToast('\u2713 Kategori tersimpan untuk ' + MONTHS_FULL[bulan - 1] + ' ' + tahun);
+            setupEditMode = false; // Lock after save
+            showToast('\u2713 Kategori tersimpan & terkunci untuk ' + MONTHS_FULL[bulan - 1] + ' ' + tahun);
             renderSetup();
             populateKategoriDropdown(document.getElementById('inputJenis').value);
             renderBudgetPlanning();
