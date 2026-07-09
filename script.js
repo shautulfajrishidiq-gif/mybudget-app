@@ -342,7 +342,7 @@ async function refreshData() {
 function populateTahunFilter() {
     const el = document.getElementById('filterTahun');
     const years = new Set([new Date().getFullYear()]);
-    dataTransaksi.forEach(i => { if (i.Tanggal) years.add(new Date(i.Tanggal).getFullYear()); });
+    dataTransaksi.forEach(i => { if (i.Tanggal) years.add(parseTanggal(i.Tanggal).getFullYear()); });
     const sorted = [...years].sort((a, b) => b - a);
     el.innerHTML = sorted.map(y => `<option value="${y}">${y}</option>`).join('');
     el.value = new Date().getFullYear();
@@ -356,7 +356,7 @@ function getFilteredData() {
     const bulan = parseInt(document.getElementById('filterBulan').value);
     return dataTransaksi.filter(item => {
         if (!item.Tanggal) return false;
-        const d = new Date(item.Tanggal);
+        const d = parseTanggal(item.Tanggal);
         if (d.getFullYear() !== tahun) return false;
         if (bulan !== 0 && (d.getMonth() + 1) !== bulan) return false;
         return true;
@@ -588,8 +588,8 @@ function makeMonthlyBar(filtered) {
         });
     } else {
         const monthly = { Income: Array(12).fill(0), Expenses: Array(12).fill(0), Savings: Array(12).fill(0) };
-        dataTransaksi.filter(i => new Date(i.Tanggal).getFullYear() === tahun).forEach(i => {
-            const m = new Date(i.Tanggal).getMonth();
+        dataTransaksi.filter(i => parseTanggal(i.Tanggal).getFullYear() === tahun).forEach(i => {
+            const m = parseTanggal(i.Tanggal).getMonth();
             if (monthly[i.Jenis]) monthly[i.Jenis][m] += Number(i.Nominal);
         });
         chartInstances['chartMonthly'] = new Chart(ctx, {
@@ -807,7 +807,7 @@ function getActualByCategory(jenis, bulan, tahun) {
     const map = {};
     dataTransaksi.forEach(i => {
         if (i.Jenis !== jenis || !i.Tanggal) return;
-        const d = new Date(i.Tanggal);
+        const d = parseTanggal(i.Tanggal);
         if (d.getFullYear() !== tahun || (d.getMonth() + 1) !== bulan) return;
         map[i.Kategori] = (map[i.Kategori] || 0) + Number(i.Nominal);
     });
@@ -944,7 +944,7 @@ function renderSisaAnggaran() {
     const actuals = {};
     dataTransaksi.filter(i => {
         if (i.Jenis !== 'Expenses' || !i.Tanggal) return false;
-        const d = new Date(i.Tanggal);
+        const d = parseTanggal(i.Tanggal);
         return d.getFullYear() === tahun && (d.getMonth() + 1) === bulan;
     }).forEach(i => { actuals[i.Kategori] = (actuals[i.Kategori] || 0) + Number(i.Nominal); });
     if (!cats.length) { container.innerHTML = '<p style="color:#94a3b8; font-size:13px">Belum ada kategori Expenses di Setup.</p>'; return; }
@@ -969,10 +969,49 @@ function renderSisaAnggaran() {
 // ==============================================
 // TABEL TRANSAKSI
 // ==============================================
+// Format any date string to DD/MM/YYYY
+function formatTanggal(tgl) {
+    if (!tgl) return '-';
+    var s = String(tgl).trim();
+    // Already DD/MM/YYYY (like "18/01/2026")
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(s)) return s.substring(0, 10);
+    // YYYY-MM-DD format (like "2026-01-18" or "2026-01-18T00:00:00")
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+        var parts = s.substring(0, 10).split('-');
+        return parts[2] + '/' + parts[1] + '/' + parts[0];
+    }
+    // "Sat Jan 18 2026 00:00:00 GMT+0700" or similar - parse directly
+    var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var m = s.match(/(\w{3})\s+(\d{1,2})\s+(\d{4})/);
+    if (m) {
+        var mi = monthNames.indexOf(m[1]);
+        if (mi >= 0) {
+            return String(m[2]).padStart(2, '0') + '/' + String(mi + 1).padStart(2, '0') + '/' + m[3];
+        }
+    }
+    // Fallback: return first 10 chars
+    return s.substring(0, 10);
+}
+
+// Parse DD/MM/YYYY or YYYY-MM-DD to Date object (fixes JS treating DD/MM as US format)
+function parseTanggal(tgl) {
+    if (!tgl) return new Date(NaN);
+    var s = String(tgl).trim();
+    var parts = s.split('/');
+    if (parts.length === 3) {
+        return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+    }
+    parts = s.split('-');
+    if (parts.length === 3) {
+        return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    }
+    return new Date(s);
+}
+
 function renderTabel(data) {
     const tbody = document.getElementById('tabelBody');
     if (!data || !data.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:28px; color:#94a3b8; font-size:13px"><i class="fa-solid fa-inbox" style="display:block; font-size:24px; margin-bottom:8px"></i>Belum ada transaksi.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:28px; color:#94a3b8; font-size:13px"><i class="fa-solid fa-inbox" style="display:block; font-size:24px; margin-bottom:8px"></i>Belum ada transaksi.</td></tr>';
         return;
     }
     tbody.innerHTML = [...data].reverse().map(item => {
@@ -981,12 +1020,11 @@ function renderTabel(data) {
         const op = isInc || isSav ? '+' : '\u2212';
         const badge = isInc ? 'badge-income' : isSav ? 'badge-savings' : 'badge-expenses';
         return `<tr style="border-bottom:1px solid #f1f5f9; font-size:12px; transition:background 0.1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-            <td style="padding:10px 12px; color:#64748b; white-space:nowrap">${item.Tanggal || '-'}</td>
+            <td style="padding:10px 12px; color:#64748b; white-space:nowrap">${formatTanggal(item.Tanggal)}</td>
             <td style="padding:10px 12px"><span class="${badge}" style="padding:3px 8px; border-radius:20px; font-size:11px; font-weight:600">${item.Jenis || '-'}</span></td>
             <td style="padding:10px 12px; color:#0f172a; font-weight:500">${item.Kategori || '-'}</td>
             <td style="padding:10px 12px; text-align:right; font-weight:700; color:${color}; white-space:nowrap">${op} ${formatRp(item.Nominal)}</td>
             <td style="padding:10px 12px; color:#64748b; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${item.Deskripsi || '-'}</td>
-            <td style="padding:10px 12px; color:#94a3b8; white-space:nowrap; font-size:11px">${item.Timestamp || '-'}</td>
             <td style="padding:10px 12px; text-align:center; white-space:nowrap">
                 <button onclick="siapkanEdit('${item.ID}')" style="background:#eff6ff; color:#2563eb; border:none; border-radius:6px; width:28px; height:28px; cursor:pointer; font-size:12px; margin-right:4px" title="Edit"><i class="fa-solid fa-pen"></i></button>
                 <button onclick="hapusTransaksi('${item.ID}')" style="background:#fef2f2; color:#dc2626; border:none; border-radius:6px; width:28px; height:28px; cursor:pointer; font-size:12px" title="Hapus"><i class="fa-solid fa-trash"></i></button>
@@ -1068,7 +1106,10 @@ function siapkanEdit(id) {
     if (!t) return;
     showPage('tracking');
     document.getElementById('inputId').value = t.ID;
-    document.getElementById('inputTanggal').value = (t.Tanggal || '').split('T')[0];
+    // Convert DD/MM/YYYY to YYYY-MM-DD for date input
+    var tglParts = (t.Tanggal || '').split('/');
+    var tglInput = tglParts.length === 3 ? tglParts[2] + '-' + tglParts[1] + '-' + tglParts[0] : (t.Tanggal || '').split('T')[0];
+    document.getElementById('inputTanggal').value = tglInput;
     document.getElementById('inputJenis').value = t.Jenis;
     warnaiJenis(t.Jenis);
     populateKategoriDropdown(t.Jenis, t.Kategori);
