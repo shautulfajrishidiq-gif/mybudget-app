@@ -76,6 +76,40 @@
         #logoutBtn { background:transparent; border:none; color:#94a3b8; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:6px; }
         #logoutBtn:hover { color:#f87171; background:rgba(255,255,255,0.05); }
 
+        /* ===== Sticky mobile header + dark mode + header refresh ===== */
+        #main-content { overflow: visible !important; }
+        #mobile-header {
+            position: fixed !important; top:0 !important; left:0 !important; right:0 !important;
+            padding: 12px 14px !important; gap:10px !important;
+        }
+        body.has-mobile-header { padding-top: 60px; }
+        .hdr-btn { background: rgba(255,255,255,0.08); border:none; color:#e2e8f0; width:34px; height:34px; border-radius:9px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; transition: background 0.15s, transform 0.15s; }
+        .hdr-btn:hover { background: rgba(255,255,255,0.16); }
+        .hdr-btn:active { transform: scale(0.94); }
+        .hdr-btn.spinning i { animation: spin 0.8s linear infinite; }
+        .dark-toggle { position:relative; width:54px; height:28px; border-radius:999px; border:2px solid #ffffff; background:#0b1220; cursor:pointer; padding:0; flex-shrink:0; transition: background 0.2s; }
+        .dark-toggle .knob { position:absolute; top:1px; left:1px; width:22px; height:22px; border-radius:50%; background:#ffffff; display:flex; align-items:center; justify-content:center; color:#0b1220; font-size:11px; transition: left 0.22s ease, background 0.2s, color 0.2s; box-shadow:0 2px 6px rgba(0,0,0,0.35); }
+        body.dark .dark-toggle { background:#f1f5f9; border-color:#0b1220; }
+        body.dark .dark-toggle .knob { left: 27px; background:#0b1220; color:#facc15; }
+        #fabRefresh { display:none !important; }
+        body.dark { background:#0b1220 !important; color:#e2e8f0; }
+        body.dark [style*="background:#f1f5f9"],
+        body.dark [style*="background: #f1f5f9"] { background:#0b1220 !important; }
+        body.dark [style*="background:white"],
+        body.dark [style*="background: white"],
+        body.dark [style*="background:#ffffff"],
+        body.dark [style*="background:#fff"] { background:#111827 !important; }
+        body.dark [style*="background:#f8fafc"] { background:#1e293b !important; }
+        body.dark [style*="color:#0f172a"] { color:#f1f5f9 !important; }
+        body.dark [style*="color:#334155"] { color:#cbd5e1 !important; }
+        body.dark [style*="color:#475569"] { color:#cbd5e1 !important; }
+        body.dark [style*="color:#64748b"] { color:#94a3b8 !important; }
+        body.dark [style*="border:1px solid #e2e8f0"] { border-color:#334155 !important; }
+        body.dark [style*="border-bottom:1px solid #f1f5f9"] { border-bottom-color:#334155 !important; }
+        body.dark [style*="border-bottom:1px solid #e2e8f0"] { border-bottom-color:#334155 !important; }
+        body.dark input, body.dark select, body.dark textarea { background:#0b1220 !important; color:#e2e8f0 !important; border-color:#334155 !important; }
+        body.dark .pbar { background:#334155; }
+        body.dark table thead tr { background:#1e293b !important; }
     </style>
 </head>
 <body>
@@ -458,10 +492,6 @@
 
     </main>
 </div>
-
-<button id="fabRefresh" title="Refresh data (drag to move)" aria-label="Refresh">
-    <i class="fa-solid fa-arrows-rotate"></i>
-</button>
 
 <nav class="sidebar-bg" id="mobile-nav" style="position:fixed; bottom:0; left:0; right:0; display:flex; z-index:40; border-top:1px solid rgba(255,255,255,0.08); box-shadow:0 -4px 20px rgba(0,0,0,0.3)">
     <button class="mob-btn active" data-page="dashboard" onclick="showPage('dashboard')">
