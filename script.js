@@ -641,27 +641,23 @@ function renderSetup() {
         }
     }
 
-    // Update Save & Lock buttons
+    // Update buttons - just toggle display, NO innerHTML changes
     const saveBtn = document.getElementById('btnSaveSetup');
+    const editBtn = document.getElementById('btnEditSetup');
     const lockBtn = document.getElementById('btnLockSetup');
     const copyWrap = document.getElementById('copySetupWrap');
 
     if (saved) {
-        if (saveBtn) saveBtn.style.display = 'flex';
-        if (lockBtn) {
-            lockBtn.style.display = 'flex';
-            if (isLocked) {
-                lockBtn.innerHTML = '<i class="fa-solid fa-lock-open"></i><span>Edit</span>';
-                lockBtn.style.background = '#d97706';
-            } else {
-                lockBtn.innerHTML = '<i class="fa-solid fa-lock"></i><span>Kunci</span>';
-                lockBtn.style.background = '#16a34a';
-            }
-        }
+        // Saved period: show Edit (if locked) or Kunci+Simpan (if unlocked)
+        if (editBtn) editBtn.style.display = isLocked ? 'flex' : 'none';
+        if (lockBtn) lockBtn.style.display = isLocked ? 'none' : 'flex';
+        if (saveBtn) saveBtn.style.display = isLocked ? 'none' : 'flex';
         if (copyWrap) copyWrap.style.display = 'none';
     } else {
-        if (saveBtn) saveBtn.style.display = 'flex';
+        // Not saved yet: show only Simpan, no lock buttons
+        if (editBtn) editBtn.style.display = 'none';
         if (lockBtn) lockBtn.style.display = 'none';
+        if (saveBtn) saveBtn.style.display = 'flex';
         if (copyWrap) {
             const savedKeys = Object.keys(kategoriByPeriod);
             if (savedKeys.length > 0) {
@@ -680,39 +676,76 @@ function renderSetup() {
         }
     }
 
-    // ALWAYS render editable inputs with + and trash buttons (same as original code)
+    // Control + (add) button visibility based on lock state
+    document.querySelectorAll('#page-setup button[onclick^="addKategori"]').forEach(btn => {
+        btn.style.display = isLocked ? 'none' : 'block';
+    });
+
+    // Render category inputs - LOCKED = readonly, UNLOCKED = editable with trash
     ['Income', 'Expenses', 'Savings'].forEach(j => {
         const el = document.getElementById('setup-' + j.toLowerCase());
         if (!el) return;
-        el.innerHTML = (setupDraft[j] || []).map((kat, idx) => `
-            <div style="display:flex; align-items:center; gap:6px">
-                <input type="text" value="${String(kat).replace(/"/g, '&quot;')}" data-jenis="${j}" data-idx="${idx}" oninput="onSetupInput('${j}', ${idx}, this.value)"
-                    style="flex:1; border:1px solid #e2e8f0; padding:6px 10px; border-radius:6px; font-size:13px; outline:none">
-                <button onclick="removeKategori('${j}', ${idx})" style="background:#fef2f2; color:#dc2626; border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:11px">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
-            </div>
-        `).join('');
-        if (!setupDraft[j] || setupDraft[j].length === 0) {
-            el.innerHTML = '<p style="color:#94a3b8; font-size:11px; padding:4px 0">Belum ada kategori. Klik + untuk menambah.</p>';
+        if (isLocked) {
+            // LOCKED: read-only inputs, NO trash buttons
+            el.innerHTML = (setupDraft[j] || []).map((kat, idx) => `
+                <div style="display:flex; align-items:center; gap:6px">
+                    <input type="text" value="${String(kat).replace(/"/g, '&quot;')}" readonly
+                        style="flex:1; border:1px solid #e2e8f0; padding:6px 10px; border-radius:6px; font-size:13px; outline:none; background:#f1f5f9; color:#64748b; cursor:not-allowed">
+                </div>
+            `).join('');
+            if (!setupDraft[j] || setupDraft[j].length === 0) {
+                el.innerHTML = '<p style="color:#94a3b8; font-size:11px; padding:4px 0">Tidak ada kategori tersimpan.</p>';
+            }
+        } else {
+            // UNLOCKED: editable inputs WITH trash buttons
+            el.innerHTML = (setupDraft[j] || []).map((kat, idx) => `
+                <div style="display:flex; align-items:center; gap:6px">
+                    <input type="text" value="${String(kat).replace(/"/g, '&quot;')}" data-jenis="${j}" data-idx="${idx}" oninput="onSetupInput('${j}', ${idx}, this.value)"
+                        style="flex:1; border:1px solid #e2e8f0; padding:6px 10px; border-radius:6px; font-size:13px; outline:none">
+                    <button onclick="removeKategori('${j}', ${idx})" style="background:#fef2f2; color:#dc2626; border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:11px">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+            if (!setupDraft[j] || setupDraft[j].length === 0) {
+                el.innerHTML = '<p style="color:#94a3b8; font-size:11px; padding:4px 0">Belum ada kategori. Klik + untuk menambah.</p>';
+            }
         }
     });
 }
 
 function onSetupInput(j, idx, val) { if (!setupDraft[j]) setupDraft[j] = []; setupDraft[j][idx] = val; }
 function addKategori(j) {
-    // Auto-unlock if period is locked
-    if (!setupEditMode) { setupEditMode = true; }
+    // Only allow adding when NOT locked
+    const bulan = parseInt(document.getElementById('setupBulan').value) || 0;
+    const tahun = parseInt(document.getElementById('setupTahun').value) || 0;
+    if (kategoriByPeriod[periodKey(bulan, tahun)] && !setupEditMode) {
+        showToast('Klik Edit dulu untuk mengubah kategori yang terkunci.', true);
+        return;
+    }
+    setupEditMode = true; // Preserve draft on re-render (critical for unsaved periods)
     (setupDraft[j] = setupDraft[j] || []).push('');
     renderSetup();
 }
 function removeKategori(j, idx) {
-    // Auto-unlock if period is locked
-    if (!setupEditMode) { setupEditMode = true; }
+    // Only allow removing when NOT locked
+    const bulan = parseInt(document.getElementById('setupBulan').value) || 0;
+    const tahun = parseInt(document.getElementById('setupTahun').value) || 0;
+    if (kategoriByPeriod[periodKey(bulan, tahun)] && !setupEditMode) {
+        showToast('Klik Edit dulu untuk mengubah kategori yang terkunci.', true);
+        return;
+    }
+    setupEditMode = true; // Preserve draft on re-render (critical for unsaved periods)
     setupDraft[j].splice(idx, 1);
     renderSetup();
 }
-function toggleLockSetup() { setupEditMode = !setupEditMode; renderSetup(); }
+function toggleLockSetup() {
+    const bulan = parseInt(document.getElementById('setupBulan').value) || 0;
+    const tahun = parseInt(document.getElementById('setupTahun').value) || 0;
+    if (!kategoriByPeriod[periodKey(bulan, tahun)]) return; // can't toggle if not saved
+    setupEditMode = !setupEditMode;
+    renderSetup();
+}
 function copySetupFrom() {
     const sel = document.querySelector('#copySetupWrap select');
     if (!sel || !sel.value) return;
@@ -724,25 +757,11 @@ function copySetupFrom() {
         Expenses: (src.Expenses || []).slice(),
         Savings:  (src.Savings || []).slice()
     };
-    // Re-render only the input fields (not the full renderSetup which would reset draft)
-    ['Income', 'Expenses', 'Savings'].forEach(j => {
-        const el = document.getElementById('setup-' + j.toLowerCase());
-        if (!el) return;
-        el.innerHTML = (setupDraft[j] || []).map((kat, idx) => `
-            <div style="display:flex; align-items:center; gap:6px">
-                <input type="text" value="${String(kat).replace(/"/g, '&quot;')}" data-jenis="${j}" data-idx="${idx}" oninput="onSetupInput('${j}', ${idx}, this.value)"
-                    style="flex:1; border:1px solid #e2e8f0; padding:6px 10px; border-radius:6px; font-size:13px; outline:none">
-                <button onclick="removeKategori('${j}', ${idx})" style="background:#fef2f2; color:#dc2626; border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:11px">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
-            </div>
-        `).join('');
-        if (!setupDraft[j] || setupDraft[j].length === 0) {
-            el.innerHTML = '<p style="color:#94a3b8; font-size:11px; padding:4px 0">Belum ada kategori. Klik + untuk menambah.</p>';
-        }
-    });
+    setupEditMode = true; // Enter edit mode so draft is preserved
+    renderSetup();
     showToast('\\u2713 Kategori disalin dari ' + key.replace('-', '/'));
 }
+
 function collectSetup() {
     const out = { Income: [], Expenses: [], Savings: [] };
     ['Income', 'Expenses', 'Savings'].forEach(j => {
