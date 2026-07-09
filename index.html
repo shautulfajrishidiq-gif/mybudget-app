@@ -401,16 +401,21 @@
         <div id="page-setup" class="page" style="padding:12px">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:8px">
                 <h2 style="font-size:16px; font-weight:700; color:#0f172a; margin:0">Setup Kategori</h2>
-                <button onclick="saveSetup()" style="background:#2563eb; color:white; border:none; padding:8px 14px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px; white-space:nowrap">
-                    <i class="fa-solid fa-floppy-disk"></i><span>Simpan</span>
-                </button>
+                <div style="display:flex; gap:6px; flex-wrap:wrap">
+                    <button id="btnLockSetup" onclick="toggleLockSetup()" style="background:#d97706; color:white; border:none; padding:8px 14px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px; white-space:nowrap">
+                        <i class="fa-solid fa-lock-open"></i><span>Edit</span>
+                    </button>
+                    <button id="btnSaveSetup" onclick="saveSetup()" style="background:#2563eb; color:white; border:none; padding:8px 14px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px; white-space:nowrap">
+                        <i class="fa-solid fa-floppy-disk"></i><span>Simpan</span>
+                    </button>
+                </div>
             </div>
-            <p style="color:#64748b; font-size:12px; margin:0 0 12px">Pilih <strong>Bulan</strong> &amp; <strong>Tahun</strong>, lalu atur kategori.</p>
+            <p style="color:#64748b; font-size:12px; margin:0 0 12px">Pilih <strong>Bulan</strong> &amp; <strong>Tahun</strong>, atur kategori, lalu <strong>Simpan</strong>. Setup terkunci per bulan setelah disimpan.</p>
 
             <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:10px; margin-bottom:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center">
                 <div style="display:flex; flex-direction:column; gap:3px">
                     <label style="font-size:10px; font-weight:600; color:#64748b">Bulan</label>
-                    <select id="setupBulan" onchange="renderSetup()" style="border:1px solid #e2e8f0; padding:6px 8px; border-radius:6px; font-size:11px; font-weight:600; outline:none; cursor:pointer">
+                    <select id="setupBulan" onchange="setupEditMode=false; renderSetup()" style="border:1px solid #e2e8f0; padding:6px 8px; border-radius:6px; font-size:11px; font-weight:600; outline:none; cursor:pointer">
                         <option value="1">Januari</option><option value="2">Februari</option>
                         <option value="3">Maret</option><option value="4">April</option>
                         <option value="5">Mei</option><option value="6">Juni</option>
@@ -421,9 +426,15 @@
                 </div>
                 <div style="display:flex; flex-direction:column; gap:3px">
                     <label style="font-size:10px; font-weight:600; color:#64748b">Tahun</label>
-                    <select id="setupTahun" onchange="renderSetup()" style="border:1px solid #e2e8f0; padding:6px 8px; border-radius:6px; font-size:11px; font-weight:600; outline:none; cursor:pointer"></select>
+                    <select id="setupTahun" onchange="setupEditMode=false; renderSetup()" style="border:1px solid #e2e8f0; padding:6px 8px; border-radius:6px; font-size:11px; font-weight:600; outline:none; cursor:pointer"></select>
                 </div>
                 <div id="setupSourceInfo" style="font-size:10px; color:#64748b; margin-left:auto"></div>
+            </div>
+            <div id="copySetupWrap" style="display:none; margin-bottom:10px; align-items:center; gap:6px; flex-wrap:wrap">
+                <span style="font-size:11px; color:#64748b; font-weight:600">Kategori kosong?</span>
+                <select onchange="copySetupFrom()" style="border:1px solid #e2e8f0; padding:5px 8px; border-radius:6px; font-size:11px; font-weight:600; outline:none; cursor:pointer">
+                    <option value="">Salin dari...</option>
+                </select>
             </div>
 
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px">
