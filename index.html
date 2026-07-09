@@ -2,12 +2,15 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MyBudget</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        * { box-sizing: border-box; }
+        html, body { width: 100%; overflow-x: hidden; }
+        
         :root {
             --sidebar: #0d2137;
             --sidebar-hover: rgba(255,255,255,0.08);
@@ -16,7 +19,12 @@
             --exp: #991b1b;
             --sav: #1e40af;
         }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f1f5f9; }
+        body { 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+            background: #f1f5f9;
+            margin: 0;
+            padding: 0;
+        }
         .sidebar-bg { background: var(--sidebar); }
         .nav-link {
             display: flex; align-items: center; gap: 12px;
@@ -29,68 +37,160 @@
         .nav-link .icon { width: 18px; text-align: center; font-size: 15px; }
         .page { display: none; }
         .page.active { display: block; }
-        .mob-btn { flex: 1; padding: 10px 4px; display: flex; flex-direction: column; align-items: center; gap: 3px; color: #64748b; border: none; background: none; font-size: 10px; cursor: pointer; transition: color 0.15s; }
+        .mob-btn { 
+            flex: 1; padding: 8px 2px; display: flex; flex-direction: column; align-items: center; gap: 2px; 
+            color: #64748b; border: none; background: none; font-size: 9px; cursor: pointer; 
+            transition: color 0.15s; 
+        }
         .mob-btn.active { color: #38bdf8; }
-        .mob-btn i { font-size: 17px; }
+        .mob-btn i { font-size: 16px; }
+        
         .pbar { height: 6px; border-radius: 3px; background: #e2e8f0; overflow: hidden; }
         .pbar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
-        .stat-card { border-radius: 12px; padding: 16px; }
+        
+        .stat-card { 
+            border-radius: 12px; padding: 12px; min-width: 0; overflow: hidden; 
+        }
+        .stat-card .stat-label { 
+            font-size: 10px; opacity: 0.85; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+        }
+        .stat-card .stat-value { 
+            font-size: 14px; font-weight: 700; line-height: 1.2; word-break: break-word; 
+        }
+        
+        @media (min-width: 640px) {
+            .stat-card .stat-value { font-size: 16px; }
+            .mob-btn font-size { font-size: 10px; }
+            .mob-btn i { font-size: 18px; }
+        }
+        @media (min-width: 768px) { 
+            .stat-card .stat-value { font-size: 18px; }
+        }
+        
         table { border-collapse: collapse; width: 100%; }
-        th { font-weight: 600; font-size: 11px; letter-spacing: 0.05em; }
-        #toast { position: fixed; bottom: 80px; right: 16px; background: #1e293b; color: white; padding: 10px 16px; border-radius: 10px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        th { font-weight: 600; font-size: 10px; letter-spacing: 0.05em; }
+        
+        #toast { 
+            position: fixed; bottom: 80px; right: 16px; background: #1e293b; color: white; 
+            padding: 10px 14px; border-radius: 10px; font-size: 12px; z-index: 999; 
+            opacity: 0; transition: opacity 0.3s; pointer-events: none; 
+        }
         #toast.show { opacity: 1; }
-        #loadingOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 998; display: flex; align-items: center; justify-content: center; }
+        
+        #loadingOverlay { 
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 998; 
+            display: flex; align-items: center; justify-content: center; 
+        }
         #loadingOverlay.hidden { display: none; }
+        
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+        
         .badge-income { background: #dcfce7; color: #166534; }
         .badge-expenses { background: #fee2e2; color: #991b1b; }
         .badge-savings { background: #dbeafe; color: #1e40af; }
-        #fabRefresh { position: fixed; right: 18px; bottom: 88px; touch-action: none; user-select: none; -webkit-user-select: none; width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg,#38bdf8,#2563eb); color:white; border:none; box-shadow: 0 8px 24px rgba(37,99,235,0.45); font-size:20px; cursor:pointer; z-index:50; display:flex; align-items:center; justify-content:center; transition: transform 0.15s, box-shadow 0.15s; }
+        
+        #fabRefresh { 
+            position: fixed; right: 18px; bottom: 88px; touch-action: none; user-select: none; 
+            -webkit-user-select: none; width: 52px; height: 52px; border-radius: 50%; 
+            background: linear-gradient(135deg,#38bdf8,#2563eb); color:white; border:none; 
+            box-shadow: 0 8px 24px rgba(37,99,235,0.45); font-size:20px; cursor:pointer; 
+            z-index:50; display:flex; align-items:center; justify-content:center; 
+            transition: transform 0.15s, box-shadow 0.15s; 
+        }
         #fabRefresh:hover { transform: scale(1.08); box-shadow: 0 10px 28px rgba(37,99,235,0.55); }
         #fabRefresh:active { transform: scale(0.95); }
         #fabRefresh.spinning i { animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @media (min-width: 768px) { #fabRefresh { bottom: 24px; } }
 
-        #savingOverlay { position: fixed; inset:0; background: rgba(15,23,42,0.55); z-index: 1000; display:none; align-items:center; justify-content:center; backdrop-filter: blur(2px); }
+        #savingOverlay { 
+            position: fixed; inset:0; background: rgba(15,23,42,0.55); z-index: 1000; 
+            display:none; align-items:center; justify-content:center; backdrop-filter: blur(2px); 
+        }
         #savingOverlay.show { display:flex; animation: fadeIn 0.15s ease; }
-        #savingOverlay .box { background:white; border-radius:16px; padding:28px 40px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.35); min-width:220px; }
-        #savingOverlay .ring { width:44px; height:44px; border:4px solid #e2e8f0; border-top-color:#2563eb; border-radius:50%; margin:0 auto 14px; animation: spin 0.8s linear infinite; }
-        #savingOverlay p { color:#0f172a; font-size:14px; font-weight:600; margin:0; }
+        #savingOverlay .box { 
+            background:white; border-radius:16px; padding:28px 36px; text-align:center; 
+            box-shadow:0 20px 60px rgba(0,0,0,0.35); min-width:200px; max-width:90%; 
+        }
+        #savingOverlay .ring { 
+            width:40px; height:40px; border:3px solid #e2e8f0; border-top-color:#2563eb; 
+            border-radius:50%; margin:0 auto 12px; animation: spin 0.8s linear infinite; 
+        }
+        #savingOverlay p { color:#0f172a; font-size:13px; font-weight:600; margin:0; }
         @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 
-        #authModal { position: fixed; inset:0; background:linear-gradient(135deg,#0d2137,#1e293b); z-index:2000; display:flex; align-items:center; justify-content:center; padding:16px; }
+        #authModal { 
+            position: fixed; inset:0; background:linear-gradient(135deg,#0d2137,#1e293b); 
+            z-index:2000; display:flex; align-items:center; justify-content:center; padding:16px; 
+        }
         #authModal.hidden { display:none; }
-        #authModal .card { background:white; border-radius:16px; padding:28px 24px; width:100%; max-width:400px; box-shadow:0 25px 70px rgba(0,0,0,0.5); }
-        #authModal h1 { font-size:22px; font-weight:800; color:#0f172a; margin:0 0 4px; text-align:center; }
-        #authModal .sub { color:#64748b; font-size:13px; text-align:center; margin:0 0 20px; }
-        #authModal .emailBox { background:#f1f5f9; border-radius:9px; padding:10px 12px; display:flex; align-items:center; gap:10px; margin-bottom:16px; font-size:13px; color:#334155; word-break:break-all; }
-        #authModal label { display:block; font-size:11px; font-weight:700; color:#64748b; letter-spacing:0.04em; margin-bottom:5px; text-transform:uppercase; }
-        #authModal input[type=password] { width:100%; border:1px solid #e2e8f0; padding:11px 12px; border-radius:9px; font-size:14px; box-sizing:border-box; outline:none; margin-bottom:12px; }
-        #authModal input[type=password]:focus { border-color:#2563eb; }
-        #authModal .primary { width:100%; background:linear-gradient(135deg,#38bdf8,#2563eb); color:white; border:none; padding:12px; border-radius:9px; font-weight:700; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+        #authModal .card { 
+            background:white; border-radius:16px; padding:24px; width:100%; max-width:380px; 
+            box-shadow:0 25px 70px rgba(0,0,0,0.5); 
+        }
+        #authModal h1 { 
+            font-size:20px; font-weight:800; color:#0f172a; margin:0 0 4px; text-align:center; 
+        }
+        #authModal .sub { color:#64748b; font-size:12px; text-align:center; margin:0 0 18px; }
+        #authModal label { 
+            display:block; font-size:11px; font-weight:700; color:#64748b; 
+            letter-spacing:0.04em; margin-bottom:5px; text-transform:uppercase; 
+        }
+        #authModal input[type=password], #authModal input[type=email] { 
+            width:100%; border:1px solid #e2e8f0; padding:10px 12px; border-radius:8px; 
+            font-size:13px; box-sizing:border-box; outline:none; margin-bottom:12px; 
+        }
+        #authModal input[type=password]:focus, #authModal input[type=email]:focus { 
+            border-color:#2563eb; 
+        }
+        #authModal .primary { 
+            width:100%; background:linear-gradient(135deg,#38bdf8,#2563eb); color:white; 
+            border:none; padding:11px; border-radius:8px; font-weight:700; font-size:13px; 
+            cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; 
+        }
         #authModal .primary:disabled { opacity:0.6; cursor:not-allowed; }
-        #authModal .err { color:#dc2626; font-size:12px; margin:0 0 10px; min-height:16px; }
-        #authModal .note { color:#94a3b8; font-size:11px; text-align:center; margin:14px 0 0; }
-        #logoutBtn { background:transparent; border:none; color:#94a3b8; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:6px; }
+        #authModal .err { color:#dc2626; font-size:11px; margin:0 0 10px; min-height:14px; }
+        #authModal .note { color:#94a3b8; font-size:10px; text-align:center; margin:12px 0 0; }
+        
+        #logoutBtn { 
+            background:transparent; border:none; color:#94a3b8; font-size:11px; 
+            cursor:pointer; display:flex; align-items:center; gap:6px; padding:6px 10px; 
+            border-radius:6px; 
+        }
         #logoutBtn:hover { color:#f87171; background:rgba(255,255,255,0.05); }
 
-        /* ===== Sticky mobile header + dark mode + header refresh ===== */
         #main-content { overflow: visible !important; }
         #mobile-header {
             position: fixed !important; top:0 !important; left:0 !important; right:0 !important;
-            padding: 12px 14px !important; gap:10px !important;
+            padding: 10px 10px !important; gap:8px !important; z-index: 30;
         }
-        body.has-mobile-header { padding-top: 60px; }
-        .hdr-btn { background: rgba(255,255,255,0.08); border:none; color:#e2e8f0; width:34px; height:34px; border-radius:9px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; transition: background 0.15s, transform 0.15s; }
+        body.has-mobile-header { padding-top: 56px; }
+        
+        .hdr-btn { 
+            background: rgba(255,255,255,0.08); border:none; color:#e2e8f0; 
+            width:32px; height:32px; border-radius:8px; cursor:pointer; 
+            display:flex; align-items:center; justify-content:center; font-size:13px; 
+            transition: background 0.15s, transform 0.15s; flex-shrink: 0;
+        }
         .hdr-btn:hover { background: rgba(255,255,255,0.16); }
         .hdr-btn:active { transform: scale(0.94); }
         .hdr-btn.spinning i { animation: spin 0.8s linear infinite; }
-        .dark-toggle { position:relative; width:54px; height:28px; border-radius:999px; border:2px solid #ffffff; background:#0b1220; cursor:pointer; padding:0; flex-shrink:0; transition: background 0.2s; }
-        .dark-toggle .knob { position:absolute; top:1px; left:1px; width:22px; height:22px; border-radius:50%; background:#ffffff; display:flex; align-items:center; justify-content:center; color:#0b1220; font-size:11px; transition: left 0.22s ease, background 0.2s, color 0.2s; box-shadow:0 2px 6px rgba(0,0,0,0.35); }
+        
+        .dark-toggle { 
+            position:relative; width:50px; height:26px; border-radius:999px; border:2px solid #ffffff; 
+            background:#0b1220; cursor:pointer; padding:0; flex-shrink:0; transition: background 0.2s; 
+        }
+        .dark-toggle .knob { 
+            position:absolute; top:1px; left:1px; width:20px; height:20px; border-radius:50%; 
+            background:#ffffff; display:flex; align-items:center; justify-content:center; 
+            color:#0b1220; font-size:10px; transition: left 0.22s ease, background 0.2s, color 0.2s; 
+            box-shadow:0 2px 6px rgba(0,0,0,0.35); 
+        }
         body.dark .dark-toggle { background:#f1f5f9; border-color:#0b1220; }
-        body.dark .dark-toggle .knob { left: 27px; background:#0b1220; color:#facc15; }
+        body.dark .dark-toggle .knob { left: 25px; background:#0b1220; color:#facc15; }
+        
         #fabRefresh { display:none !important; }
         body.dark { background:#0b1220 !important; color:#e2e8f0; }
         body.dark [style*="background:#f1f5f9"],
@@ -107,7 +207,9 @@
         body.dark [style*="border:1px solid #e2e8f0"] { border-color:#334155 !important; }
         body.dark [style*="border-bottom:1px solid #f1f5f9"] { border-bottom-color:#334155 !important; }
         body.dark [style*="border-bottom:1px solid #e2e8f0"] { border-bottom-color:#334155 !important; }
-        body.dark input, body.dark select, body.dark textarea { background:#0b1220 !important; color:#e2e8f0 !important; border-color:#334155 !important; }
+        body.dark input, body.dark select, body.dark textarea { 
+            background:#0b1220 !important; color:#e2e8f0 !important; border-color:#334155 !important; 
+        }
         body.dark .pbar { background:#334155; }
         body.dark table thead tr { background:#1e293b !important; }
     </style>
@@ -117,16 +219,16 @@
 <!-- ========== AUTH MODAL ========== -->
 <div id="authModal" class="hidden">
     <div class="card">
-        <div style="display:flex; justify-content:center; margin-bottom:14px">
-            <div style="width:52px; height:52px; background:linear-gradient(135deg,#38bdf8,#2563eb); border-radius:14px; display:flex; align-items:center; justify-content:center">
-                <i class="fa-solid fa-wallet" style="color:white; font-size:22px"></i>
+        <div style="display:flex; justify-content:center; margin-bottom:12px">
+            <div style="width:48px; height:48px; background:linear-gradient(135deg,#38bdf8,#2563eb); border-radius:12px; display:flex; align-items:center; justify-content:center">
+                <i class="fa-solid fa-wallet" style="color:white; font-size:20px"></i>
             </div>
         </div>
         <h1>MyBudget</h1>
         <p class="sub" id="authSubtitle">Masuk untuk lanjut</p>
         <div id="emailWrap" style="display:none">
             <label>Email</label>
-            <input type="email" id="authEmail" placeholder="email@gmail.com" required style="width:100%; border:1px solid #e2e8f0; padding:11px 12px; border-radius:9px; font-size:14px; box-sizing:border-box; outline:none; margin-bottom:12px">
+            <input type="email" id="authEmail" placeholder="email@gmail.com" required>
         </div>
         <form id="authForm" autocomplete="off">
             <label id="lblPw1">Password</label>
@@ -154,9 +256,9 @@
 </div>
 
 <div id="loadingOverlay">
-    <div style="background:white; border-radius:16px; padding:28px 36px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.3)">
-        <i class="fa-solid fa-spinner fa-spin" style="font-size:28px; color:#3b82f6; display:block; margin-bottom:12px"></i>
-        <p style="color:#475569; font-size:14px; font-weight:500">Memuat data...</p>
+    <div style="background:white; border-radius:16px; padding:24px 28px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size:24px; color:#3b82f6; display:block; margin-bottom:10px"></i>
+        <p style="color:#475569; font-size:13px; font-weight:500; margin:0">Memuat data...</p>
     </div>
 </div>
 
@@ -165,18 +267,18 @@
 <div style="display:flex; min-height:100vh;">
 
     <aside class="sidebar-bg" style="width:220px; min-height:100vh; position:fixed; top:0; left:0; z-index:40; flex-direction:column; display:none;" id="sidebar-desktop">
-        <div style="padding:20px 16px 16px; border-bottom:1px solid rgba(255,255,255,0.08)">
+        <div style="padding:18px 14px 14px; border-bottom:1px solid rgba(255,255,255,0.08)">
             <div style="display:flex; align-items:center; gap:10px">
-                <div style="width:34px; height:34px; background:linear-gradient(135deg,#38bdf8,#2563eb); border-radius:9px; display:flex; align-items:center; justify-content:center">
-                    <i class="fa-solid fa-wallet" style="color:white; font-size:15px"></i>
+                <div style="width:32px; height:32px; background:linear-gradient(135deg,#38bdf8,#2563eb); border-radius:8px; display:flex; align-items:center; justify-content:center">
+                    <i class="fa-solid fa-wallet" style="color:white; font-size:14px"></i>
                 </div>
                 <div>
-                    <p style="color:white; font-weight:700; font-size:15px; margin:0">MyBudget</p>
-                    <p style="color:#475569; font-size:10px; margin:0">Finance Tracker</p>
+                    <p style="color:white; font-weight:700; font-size:14px; margin:0">MyBudget</p>
+                    <p style="color:#475569; font-size:9px; margin:0">Finance Tracker</p>
                 </div>
             </div>
         </div>
-        <nav style="flex:1; padding:12px 0">
+        <nav style="flex:1; padding:10px 0">
             <button class="nav-link active" data-page="dashboard" onclick="showPage('dashboard')">
                 <i class="fa-solid fa-chart-pie icon"></i><span>Dashboard</span>
             </button>
@@ -190,131 +292,125 @@
                 <i class="fa-solid fa-list-check icon"></i><span>Budget Tracking</span>
             </button>
         </nav>
-        <div style="padding:14px; border-top:1px solid rgba(255,255,255,0.08); text-align:center">
-            <button id="logoutBtn" onclick="doLogout()" style="margin:0 auto 8px; color:#94a3b8; background:transparent; border:1px solid rgba(255,255,255,0.1); padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:6px"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
-            <p style="color:#334155; font-size:11px">&copy; 2026 MyBudget</p>
+        <div style="padding:12px; border-top:1px solid rgba(255,255,255,0.08); text-align:center">
+            <button id="logoutBtn" onclick="doLogout()" style="margin:0 auto 8px">
+                <i class="fa-solid fa-right-from-bracket"></i> Logout
+            </button>
+            <p style="color:#334155; font-size:10px; margin:0">&copy; 2026 MyBudget</p>
         </div>
     </aside>
 
-    <main id="main-content" style="flex:1; overflow-y:auto; padding-bottom:72px">
+    <main id="main-content" style="flex:1; overflow-y:auto; padding-bottom:70px; width:100%">
 
-        <header class="sidebar-bg" id="mobile-header" style="display:flex; align-items:center; gap:10px; padding:12px 14px; z-index:30; box-shadow:0 2px 8px rgba(0,0,0,0.3)">
-            <div style="width:30px; height:30px; background:linear-gradient(135deg,#38bdf8,#2563eb); border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0">
-                <i class="fa-solid fa-wallet" style="color:white; font-size:13px"></i>
+        <header class="sidebar-bg" id="mobile-header" style="display:flex; align-items:center; gap:6px; padding:10px; z-index:30; box-shadow:0 2px 8px rgba(0,0,0,0.3)">
+            <div style="width:28px; height:28px; background:linear-gradient(135deg,#38bdf8,#2563eb); border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0">
+                <i class="fa-solid fa-wallet" style="color:white; font-size:12px"></i>
             </div>
-            <span style="color:white; font-weight:700; font-size:15px">MyBudget</span>
-            <span id="mobilePageTitle" style="color:#64748b; font-size:12px; margin-left:auto; margin-right:6px">Dashboard</span>
+            <span style="color:white; font-weight:700; font-size:14px; min-width:0">MyBudget</span>
+            <span id="mobilePageTitle" style="color:#64748b; font-size:11px; margin-left:auto; margin-right:4px; white-space:nowrap; flex-shrink:0">Dashboard</span>
             <button id="headerRefresh" class="hdr-btn" title="Refresh data" aria-label="Refresh"><i class="fa-solid fa-arrows-rotate"></i></button>
             <button id="darkToggle" class="dark-toggle" title="Toggle dark mode" aria-label="Toggle dark mode"><span class="knob"><i class="fa-solid fa-sun"></i></span></button>
             <button onclick="doLogout()" class="hdr-btn" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
         </header>
 
         <!-- ============ PAGE: DASHBOARD ============ -->
-        <div id="page-dashboard" class="page active" style="padding:16px">
-            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:16px">
-                <h2 style="font-size:18px; font-weight:700; color:#0f172a; margin:0; flex:1">Dashboard</h2>
-                <div style="display:flex; gap:8px; flex-wrap:wrap">
-                    <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:6px 12px; display:flex; align-items:center; gap:8px">
-                        <span style="font-size:11px; color:#64748b; font-weight:600">TAHUN</span>
-                        <select id="filterTahun" onchange="renderDashboard()" style="border:none; background:transparent; font-size:13px; font-weight:700; color:#0f172a; cursor:pointer; outline:none"></select>
+        <div id="page-dashboard" class="page active" style="padding:12px">
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px">
+                <h2 style="font-size:16px; font-weight:700; color:#0f172a; margin:0; margin-right:auto">Dashboard</h2>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center">
+                    <div style="background:white; border:1px solid #e2e8f0; border-radius:7px; padding:5px 8px; display:flex; align-items:center; gap:4px; min-width:0">
+                        <span style="font-size:9px; color:#64748b; font-weight:600; white-space:nowrap">TAHUN</span>
+                        <select id="filterTahun" onchange="renderDashboard()" style="border:none; background:transparent; font-size:11px; font-weight:700; color:#0f172a; cursor:pointer; outline:none; min-width:0"></select>
                     </div>
-                    <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:6px 12px; display:flex; align-items:center; gap:8px">
-                        <span style="font-size:11px; color:#64748b; font-weight:600">BULAN</span>
-                        <select id="filterBulan" onchange="renderDashboard()" style="border:none; background:transparent; font-size:13px; font-weight:700; color:#0f172a; cursor:pointer; outline:none">
+                    <div style="background:white; border:1px solid #e2e8f0; border-radius:7px; padding:5px 8px; display:flex; align-items:center; gap:4px; min-width:0">
+                        <span style="font-size:9px; color:#64748b; font-weight:600; white-space:nowrap">BULAN</span>
+                        <select id="filterBulan" onchange="renderDashboard()" style="border:none; background:transparent; font-size:11px; font-weight:700; color:#0f172a; cursor:pointer; outline:none; min-width:0">
                             <option value="0">Total Year</option>
-                            <option value="1">Januari</option><option value="2">Februari</option>
-                            <option value="3">Maret</option><option value="4">April</option>
-                            <option value="5">Mei</option><option value="6">Juni</option>
-                            <option value="7">Juli</option><option value="8">Agustus</option>
-                            <option value="9">September</option><option value="10">Oktober</option>
-                            <option value="11">November</option><option value="12">Desember</option>
+                            <option value="1">Jan</option><option value="2">Feb</option>
+                            <option value="3">Mar</option><option value="4">Apr</option>
+                            <option value="5">Mei</option><option value="6">Jun</option>
+                            <option value="7">Jul</option><option value="8">Agu</option>
+                            <option value="9">Sep</option><option value="10">Okt</option>
+                            <option value="11">Nov</option><option value="12">Des</option>
                         </select>
                     </div>
                 </div>
             </div>
 
-            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:16px" id="summaryCards">
+            <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-bottom:12px">
                 <div class="stat-card" style="background:linear-gradient(135deg,#15803d,#166534); color:white">
-                    <div style="font-size:11px; opacity:0.8; margin-bottom:6px; display:flex; align-items:center; gap:6px">
-                        <i class="fa-solid fa-arrow-trend-up"></i> Total Income
-                    </div>
-                    <div style="font-size:18px; font-weight:700" id="dash-income">Rp 0</div>
+                    <div class="stat-label"><i class="fa-solid fa-arrow-trend-up"></i><span>Income</span></div>
+                    <div class="stat-value" id="dash-income">Rp 0</div>
                 </div>
                 <div class="stat-card" style="background:linear-gradient(135deg,#991b1b,#7f1d1d); color:white">
-                    <div style="font-size:11px; opacity:0.8; margin-bottom:6px; display:flex; align-items:center; gap:6px">
-                        <i class="fa-solid fa-arrow-trend-down"></i> Total Expenses
-                    </div>
-                    <div style="font-size:18px; font-weight:700" id="dash-expenses">Rp 0</div>
+                    <div class="stat-label"><i class="fa-solid fa-arrow-trend-down"></i><span>Expenses</span></div>
+                    <div class="stat-value" id="dash-expenses">Rp 0</div>
                 </div>
                 <div class="stat-card" style="background:linear-gradient(135deg,#1e40af,#1e3a8a); color:white">
-                    <div style="font-size:11px; opacity:0.8; margin-bottom:6px; display:flex; align-items:center; gap:6px">
-                        <i class="fa-solid fa-piggy-bank"></i> Total Savings
-                    </div>
-                    <div style="font-size:18px; font-weight:700" id="dash-savings">Rp 0</div>
+                    <div class="stat-label"><i class="fa-solid fa-piggy-bank"></i><span>Savings</span></div>
+                    <div class="stat-value" id="dash-savings">Rp 0</div>
                 </div>
                 <div class="stat-card" style="background:white; border:1px solid #e2e8f0">
-                    <div style="font-size:11px; color:#64748b; margin-bottom:6px; display:flex; align-items:center; gap:6px">
-                        <i class="fa-solid fa-percent" style="color:#0284c7"></i> Savings Rate
-                    </div>
-                    <div style="font-size:24px; font-weight:800; color:#0284c7" id="dash-rate">0%</div>
+                    <div class="stat-label" style="color:#64748b; opacity:1"><i class="fa-solid fa-percent" style="color:#0284c7"></i><span>Rate</span></div>
+                    <div class="stat-value" style="color:#0284c7" id="dash-rate">0%</div>
                 </div>
             </div>
 
-            <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px">
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:14px">
                 <div id="breakdown-income"></div>
                 <div id="breakdown-expenses"></div>
                 <div id="breakdown-savings"></div>
             </div>
 
-            <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0; margin-bottom:12px">
-                <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:6px">
-                    <i class="fa-solid fa-arrow-trend-up" style="color:#15803d; font-size:12px"></i>Top Income
+            <div style="background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0; margin-bottom:10px">
+                <p style="font-size:10px; font-weight:700; color:#64748b; margin:0 0 8px; display:flex; align-items:center; gap:4px">
+                    <i class="fa-solid fa-arrow-trend-up" style="color:#15803d; font-size:11px"></i><span>Top Income</span>
                 </p>
-                <div style="height:180px; display:flex; align-items:center; justify-content:center">
+                <div style="height:140px; display:flex; align-items:center; justify-content:center">
                     <canvas id="chartIncome"></canvas>
                 </div>
             </div>
 
-            <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0; margin-bottom:12px">
-                <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:6px">
-                    <i class="fa-solid fa-arrow-trend-down" style="color:#991b1b; font-size:12px"></i>Top Expenses
+            <div style="background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0; margin-bottom:10px">
+                <p style="font-size:10px; font-weight:700; color:#64748b; margin:0 0 8px; display:flex; align-items:center; gap:4px">
+                    <i class="fa-solid fa-arrow-trend-down" style="color:#991b1b; font-size:11px"></i><span>Top Expenses</span>
                 </p>
-                <div style="height:180px; display:flex; align-items:center; justify-content:center">
+                <div style="height:140px; display:flex; align-items:center; justify-content:center">
                     <canvas id="chartExpenses"></canvas>
                 </div>
             </div>
 
-            <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0; margin-bottom:12px">
-                <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em; display:flex; align-items:center; gap:6px">
-                    <i class="fa-solid fa-piggy-bank" style="color:#1e40af; font-size:12px"></i>Top Savings
+            <div style="background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0; margin-bottom:10px">
+                <p style="font-size:10px; font-weight:700; color:#64748b; margin:0 0 8px; display:flex; align-items:center; gap:4px">
+                    <i class="fa-solid fa-piggy-bank" style="color:#1e40af; font-size:11px"></i><span>Top Savings</span>
                 </p>
-                <div style="height:180px; display:flex; align-items:center; justify-content:center">
+                <div style="height:140px; display:flex; align-items:center; justify-content:center">
                     <canvas id="chartSavings"></canvas>
                 </div>
             </div>
 
-            <div style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0">
-                <p style="font-size:11px; font-weight:700; color:#64748b; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.05em">Aktual per Bulan</p>
-                <div style="height:220px">
+            <div style="background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0">
+                <p style="font-size:10px; font-weight:700; color:#64748b; margin:0 0 8px">Aktual per Bulan</p>
+                <div style="height:180px">
                     <canvas id="chartMonthly"></canvas>
                 </div>
             </div>
         </div>
 
         <!-- ============ PAGE: SETUP ============ -->
-        <div id="page-setup" class="page" style="padding:16px">
+        <div id="page-setup" class="page" style="padding:12px">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:8px">
-                <h2 style="font-size:18px; font-weight:700; color:#0f172a; margin:0">Setup Kategori</h2>
-                <button onclick="saveSetup()" style="background:#2563eb; color:white; border:none; padding:9px 18px; border-radius:9px; font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px">
-                    <i class="fa-solid fa-floppy-disk"></i> Simpan
+                <h2 style="font-size:16px; font-weight:700; color:#0f172a; margin:0">Setup Kategori</h2>
+                <button onclick="saveSetup()" style="background:#2563eb; color:white; border:none; padding:8px 14px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px; white-space:nowrap">
+                    <i class="fa-solid fa-floppy-disk"></i><span>Simpan</span>
                 </button>
             </div>
-            <p style="color:#64748b; font-size:13px; margin:0 0 12px">Pilih <strong>Bulan</strong> &amp; <strong>Tahun</strong> dulu, lalu atur kategori untuk periode tersebut. Bila periode kosong, kategori otomatis mengikuti periode terakhir yang pernah diisi.</p>
+            <p style="color:#64748b; font-size:12px; margin:0 0 12px">Pilih <strong>Bulan</strong> &amp; <strong>Tahun</strong>, lalu atur kategori.</p>
 
-            <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center">
-                <div style="display:flex; flex-direction:column; gap:4px">
-                    <label style="font-size:11px; font-weight:600; color:#64748b">Bulan</label>
-                    <select id="setupBulan" onchange="renderSetup()" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:7px; font-size:13px; font-weight:600; outline:none; cursor:pointer">
+            <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:10px; margin-bottom:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center">
+                <div style="display:flex; flex-direction:column; gap:3px">
+                    <label style="font-size:10px; font-weight:600; color:#64748b">Bulan</label>
+                    <select id="setupBulan" onchange="renderSetup()" style="border:1px solid #e2e8f0; padding:6px 8px; border-radius:6px; font-size:11px; font-weight:600; outline:none; cursor:pointer">
                         <option value="1">Januari</option><option value="2">Februari</option>
                         <option value="3">Maret</option><option value="4">April</option>
                         <option value="5">Mei</option><option value="6">Juni</option>
@@ -323,58 +419,58 @@
                         <option value="11">November</option><option value="12">Desember</option>
                     </select>
                 </div>
-                <div style="display:flex; flex-direction:column; gap:4px">
-                    <label style="font-size:11px; font-weight:600; color:#64748b">Tahun</label>
-                    <select id="setupTahun" onchange="renderSetup()" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:7px; font-size:13px; font-weight:600; outline:none; cursor:pointer"></select>
+                <div style="display:flex; flex-direction:column; gap:3px">
+                    <label style="font-size:10px; font-weight:600; color:#64748b">Tahun</label>
+                    <select id="setupTahun" onchange="renderSetup()" style="border:1px solid #e2e8f0; padding:6px 8px; border-radius:6px; font-size:11px; font-weight:600; outline:none; cursor:pointer"></select>
                 </div>
-                <div id="setupSourceInfo" style="font-size:11px; color:#64748b; margin-left:auto"></div>
+                <div id="setupSourceInfo" style="font-size:10px; color:#64748b; margin-left:auto"></div>
             </div>
 
-            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px">
                 <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
-                    <div style="background:#15803d; color:white; padding:12px 16px; display:flex; align-items:center; justify-content:space-between">
-                        <span style="font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px">
-                            <i class="fa-solid fa-arrow-trend-up"></i> Income
+                    <div style="background:#15803d; color:white; padding:10px 12px; display:flex; align-items:center; justify-content:space-between">
+                        <span style="font-weight:600; font-size:12px; display:flex; align-items:center; gap:6px">
+                            <i class="fa-solid fa-arrow-trend-up"></i><span>Income</span>
                         </span>
-                        <button onclick="addKategori('Income')" style="background:rgba(255,255,255,0.2); border:none; color:white; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:13px">+</button>
+                        <button onclick="addKategori('Income')" style="background:rgba(255,255,255,0.2); border:none; color:white; border-radius:5px; width:24px; height:24px; cursor:pointer; font-size:12px">+</button>
                     </div>
-                    <div id="setup-income" style="padding:12px; display:flex; flex-direction:column; gap:6px"></div>
+                    <div id="setup-income" style="padding:10px; display:flex; flex-direction:column; gap:6px"></div>
                 </div>
                 <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
-                    <div style="background:#991b1b; color:white; padding:12px 16px; display:flex; align-items:center; justify-content:space-between">
-                        <span style="font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px">
-                            <i class="fa-solid fa-arrow-trend-down"></i> Expenses
+                    <div style="background:#991b1b; color:white; padding:10px 12px; display:flex; align-items:center; justify-content:space-between">
+                        <span style="font-weight:600; font-size:12px; display:flex; align-items:center; gap:6px">
+                            <i class="fa-solid fa-arrow-trend-down"></i><span>Expenses</span>
                         </span>
-                        <button onclick="addKategori('Expenses')" style="background:rgba(255,255,255,0.2); border:none; color:white; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:13px">+</button>
+                        <button onclick="addKategori('Expenses')" style="background:rgba(255,255,255,0.2); border:none; color:white; border-radius:5px; width:24px; height:24px; cursor:pointer; font-size:12px">+</button>
                     </div>
-                    <div id="setup-expenses" style="padding:12px; display:flex; flex-direction:column; gap:6px"></div>
+                    <div id="setup-expenses" style="padding:10px; display:flex; flex-direction:column; gap:6px"></div>
                 </div>
                 <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
-                    <div style="background:#1e40af; color:white; padding:12px 16px; display:flex; align-items:center; justify-content:space-between">
-                        <span style="font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px">
-                            <i class="fa-solid fa-piggy-bank"></i> Savings
+                    <div style="background:#1e40af; color:white; padding:10px 12px; display:flex; align-items:center; justify-content:space-between">
+                        <span style="font-weight:600; font-size:12px; display:flex; align-items:center; gap:6px">
+                            <i class="fa-solid fa-piggy-bank"></i><span>Savings</span>
                         </span>
-                        <button onclick="addKategori('Savings')" style="background:rgba(255,255,255,0.2); border:none; color:white; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:13px">+</button>
+                        <button onclick="addKategori('Savings')" style="background:rgba(255,255,255,0.2); border:none; color:white; border-radius:5px; width:24px; height:24px; cursor:pointer; font-size:12px">+</button>
                     </div>
-                    <div id="setup-savings" style="padding:12px; display:flex; flex-direction:column; gap:6px"></div>
+                    <div id="setup-savings" style="padding:10px; display:flex; flex-direction:column; gap:6px"></div>
                 </div>
             </div>
         </div>
 
         <!-- ============ PAGE: BUDGET PLANNING ============ -->
-        <div id="page-budget" class="page" style="padding:16px">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px">
-                <h2 style="font-size:18px; font-weight:700; color:#0f172a; margin:0">Budget Planning</h2>
-                <button onclick="saveBudget()" style="background:#2563eb; color:white; border:none; padding:9px 18px; border-radius:9px; font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px">
-                    <i class="fa-solid fa-floppy-disk"></i> Simpan
+        <div id="page-budget" class="page" style="padding:12px">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:8px">
+                <h2 style="font-size:16px; font-weight:700; color:#0f172a; margin:0">Budget Planning</h2>
+                <button onclick="saveBudget()" style="background:#2563eb; color:white; border:none; padding:8px 14px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px; white-space:nowrap">
+                    <i class="fa-solid fa-floppy-disk"></i><span>Simpan</span>
                 </button>
             </div>
-            <p style="color:#64748b; font-size:13px; margin:0 0 12px">Pilih <strong>Bulan</strong> &amp; <strong>Tahun</strong> dulu, lalu isi anggaran per kategori untuk periode tersebut.</p>
+            <p style="color:#64748b; font-size:12px; margin:0 0 12px">Pilih <strong>Bulan</strong> &amp; <strong>Tahun</strong>, lalu isi anggaran.</p>
 
-            <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center">
-                <div style="display:flex; flex-direction:column; gap:4px">
-                    <label style="font-size:11px; font-weight:600; color:#64748b">Bulan</label>
-                    <select id="budgetBulan" onchange="renderBudgetPlanning()" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:7px; font-size:13px; font-weight:600; outline:none; cursor:pointer">
+            <div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:10px; margin-bottom:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center">
+                <div style="display:flex; flex-direction:column; gap:3px">
+                    <label style="font-size:10px; font-weight:600; color:#64748b">Bulan</label>
+                    <select id="budgetBulan" onchange="renderBudgetPlanning()" style="border:1px solid #e2e8f0; padding:6px 8px; border-radius:6px; font-size:11px; font-weight:600; outline:none; cursor:pointer">
                         <option value="1">Januari</option><option value="2">Februari</option>
                         <option value="3">Maret</option><option value="4">April</option>
                         <option value="5">Mei</option><option value="6">Juni</option>
@@ -383,62 +479,62 @@
                         <option value="11">November</option><option value="12">Desember</option>
                     </select>
                 </div>
-                <div style="display:flex; flex-direction:column; gap:4px">
-                    <label style="font-size:11px; font-weight:600; color:#64748b">Tahun</label>
-                    <select id="budgetTahun" onchange="renderBudgetPlanning()" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:7px; font-size:13px; font-weight:600; outline:none; cursor:pointer"></select>
+                <div style="display:flex; flex-direction:column; gap:3px">
+                    <label style="font-size:10px; font-weight:600; color:#64748b">Tahun</label>
+                    <select id="budgetTahun" onchange="renderBudgetPlanning()" style="border:1px solid #e2e8f0; padding:6px 8px; border-radius:6px; font-size:11px; font-weight:600; outline:none; cursor:pointer"></select>
                 </div>
             </div>
 
-            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px">
-                <div id="budget-income" style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0"></div>
-                <div id="budget-expenses" style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0"></div>
-                <div id="budget-savings" style="background:white; border-radius:12px; padding:14px; border:1px solid #e2e8f0"></div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:10px">
+                <div id="budget-income" style="background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0"></div>
+                <div id="budget-expenses" style="background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0"></div>
+                <div id="budget-savings" style="background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0"></div>
             </div>
-            <div id="budgetSummary" style="margin-top:14px"></div>
+            <div id="budgetSummary" style="margin-top:12px"></div>
         </div>
 
         <!-- ============ PAGE: BUDGET TRACKING ============ -->
-        <div id="page-tracking" class="page" style="padding:16px">
-            <h2 style="font-size:18px; font-weight:700; color:#0f172a; margin:0 0 16px">Budget Tracking</h2>
+        <div id="page-tracking" class="page" style="padding:12px">
+            <h2 style="font-size:16px; font-weight:700; color:#0f172a; margin:0 0 14px">Budget Tracking</h2>
 
-            <div style="display:grid; grid-template-columns:1fr; gap:12px">
+            <div style="display:grid; grid-template-columns:1fr; gap:10px">
 
                 <!-- Form -->
-                <div style="background:white; border-radius:12px; padding:16px; border:1px solid #e2e8f0">
-                    <h3 style="font-size:14px; font-weight:700; color:#0f172a; margin:0 0 14px; padding-bottom:10px; border-bottom:1px solid #f1f5f9">Tambah Transaksi</h3>
-                    <form id="formTransaksi" style="display:flex; flex-direction:column; gap:12px; text-align:left">
+                <div style="background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0">
+                    <h3 style="font-size:13px; font-weight:700; color:#0f172a; margin:0 0 12px; padding-bottom:8px; border-bottom:1px solid #f1f5f9">Tambah Transaksi</h3>
+                    <form id="formTransaksi" style="display:flex; flex-direction:column; gap:10px">
                         <input type="hidden" id="inputId">
-                        <div style="display:flex; flex-direction:column; gap:5px">
-                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em">Tanggal</label>
-                            <input type="date" id="inputTanggal" required style="width:100%; border:1px solid #e2e8f0; padding:9px 12px; border-radius:8px; font-size:13px; box-sizing:border-box; outline:none; background:white">
+                        <div style="display:flex; flex-direction:column; gap:4px">
+                            <label style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase">Tanggal</label>
+                            <input type="date" id="inputTanggal" required style="width:100%; border:1px solid #e2e8f0; padding:8px 10px; border-radius:7px; font-size:12px; box-sizing:border-box; outline:none; background:white">
                         </div>
-                        <div style="display:flex; flex-direction:column; gap:5px">
-                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em">Jenis</label>
-                            <select id="inputJenis" required style="width:100%; border:1px solid #e2e8f0; padding:9px 12px; border-radius:8px; font-size:13px; font-weight:600; box-sizing:border-box; outline:none; cursor:pointer; background:white">
+                        <div style="display:flex; flex-direction:column; gap:4px">
+                            <label style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase">Jenis</label>
+                            <select id="inputJenis" required style="width:100%; border:1px solid #e2e8f0; padding:8px 10px; border-radius:7px; font-size:12px; font-weight:600; box-sizing:border-box; outline:none; cursor:pointer; background:white">
                                 <option value="Income">Income</option>
                                 <option value="Expenses">Expenses</option>
                                 <option value="Savings">Savings</option>
                             </select>
                         </div>
-                        <div style="display:flex; flex-direction:column; gap:5px">
-                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em">Kategori</label>
-                            <select id="inputKategori" required style="width:100%; border:1px solid #e2e8f0; padding:9px 12px; border-radius:8px; font-size:13px; box-sizing:border-box; outline:none; cursor:pointer; background:white">
+                        <div style="display:flex; flex-direction:column; gap:4px">
+                            <label style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase">Kategori</label>
+                            <select id="inputKategori" required style="width:100%; border:1px solid #e2e8f0; padding:8px 10px; border-radius:7px; font-size:12px; box-sizing:border-box; outline:none; cursor:pointer; background:white">
                                 <option value="">-- Pilih Kategori --</option>
                             </select>
                         </div>
-                        <div style="display:flex; flex-direction:column; gap:5px">
-                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em">Nominal (Rp)</label>
-                            <input type="text" id="inputNominal" placeholder="0" required style="width:100%; border:1px solid #e2e8f0; padding:9px 12px; border-radius:8px; font-size:13px; box-sizing:border-box; outline:none">
+                        <div style="display:flex; flex-direction:column; gap:4px">
+                            <label style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase">Nominal (Rp)</label>
+                            <input type="text" id="inputNominal" placeholder="0" required style="width:100%; border:1px solid #e2e8f0; padding:8px 10px; border-radius:7px; font-size:12px; box-sizing:border-box; outline:none">
                         </div>
-                        <div style="display:flex; flex-direction:column; gap:5px">
-                            <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em">Deskripsi</label>
-                            <input type="text" id="inputDeskripsi" placeholder="Opsional..." style="width:100%; border:1px solid #e2e8f0; padding:9px 12px; border-radius:8px; font-size:13px; box-sizing:border-box; outline:none">
+                        <div style="display:flex; flex-direction:column; gap:4px">
+                            <label style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase">Deskripsi</label>
+                            <input type="text" id="inputDeskripsi" placeholder="Opsional..." style="width:100%; border:1px solid #e2e8f0; padding:8px 10px; border-radius:7px; font-size:12px; box-sizing:border-box; outline:none">
                         </div>
-                        <div style="display:flex; gap:8px; margin-top:4px">
-                            <button type="submit" id="btnSubmit" style="flex:1; background:#2563eb; color:white; border:none; padding:11px; border-radius:9px; font-weight:700; font-size:13px; cursor:pointer; transition:background 0.15s">
+                        <div style="display:flex; gap:8px; margin-top:2px">
+                            <button type="submit" id="btnSubmit" style="flex:1; background:#2563eb; color:white; border:none; padding:10px; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; transition:background 0.15s">
                                 Simpan Transaksi
                             </button>
-                            <button type="button" id="btnCancel" onclick="resetForm()" style="background:#f1f5f9; color:#475569; border:none; padding:11px 14px; border-radius:9px; font-size:13px; cursor:pointer; display:none">
+                            <button type="button" id="btnCancel" onclick="resetForm()" style="background:#f1f5f9; color:#475569; border:none; padding:10px 12px; border-radius:8px; font-size:12px; cursor:pointer; display:none">
                                 Batal
                             </button>
                         </div>
@@ -446,21 +542,21 @@
                 </div>
 
                 <!-- Sisa Anggaran Expenses -->
-                <div style="background:white; border-radius:12px; padding:16px; border:1px solid #e2e8f0">
-                    <h3 id="sisaAnggaranTitle" style="font-size:13px; font-weight:700; color:#0f172a; margin:0 0 12px; padding-bottom:10px; border-bottom:1px solid #f1f5f9; display:flex; align-items:center; gap:6px">
-                        <i class="fa-solid fa-gauge" style="color:#991b1b; font-size:12px"></i>
-                        Sisa Anggaran Expenses (Bulan Ini)
+                <div style="background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0">
+                    <h3 id="sisaAnggaranTitle" style="font-size:12px; font-weight:700; color:#0f172a; margin:0 0 10px; padding-bottom:8px; border-bottom:1px solid #f1f5f9; display:flex; align-items:center; gap:4px">
+                        <i class="fa-solid fa-gauge" style="color:#991b1b; font-size:11px"></i>
+                        <span>Sisa Anggaran Expenses</span>
                     </h3>
-                    <div id="sisaAnggaran" style="display:flex; flex-direction:column; gap:10px"></div>
+                    <div id="sisaAnggaran" style="display:flex; flex-direction:column; gap:8px"></div>
                 </div>
 
                 <!-- Riwayat Transaksi -->
                 <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
-                    <div style="padding:14px 16px; border-bottom:1px solid #f1f5f9; display:flex; flex-direction:column; gap:8px">
-                        <h3 style="font-size:14px; font-weight:700; color:#0f172a; margin:0">Riwayat Transaksi</h3>
-                        <div style="display:flex; gap:8px">
-                            <input type="text" id="searchKeyword" placeholder="Cari..." style="flex:1; border:1px solid #e2e8f0; padding:7px 10px; border-radius:8px; font-size:13px; outline:none">
-                            <select id="filterJenis" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:8px; font-size:13px; outline:none; cursor:pointer">
+                    <div style="padding:12px; border-bottom:1px solid #f1f5f9; display:flex; flex-direction:column; gap:8px">
+                        <h3 style="font-size:13px; font-weight:700; color:#0f172a; margin:0">Riwayat Transaksi</h3>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap">
+                            <input type="text" id="searchKeyword" placeholder="Cari..." style="flex:1; min-width:120px; border:1px solid #e2e8f0; padding:7px 10px; border-radius:7px; font-size:12px; outline:none">
+                            <select id="filterJenis" style="border:1px solid #e2e8f0; padding:7px 10px; border-radius:7px; font-size:12px; outline:none; cursor:pointer; background:white">
                                 <option value="">Semua</option>
                                 <option value="Income">Income</option>
                                 <option value="Expenses">Expenses</option>
@@ -468,21 +564,20 @@
                             </select>
                         </div>
                     </div>
-                    <div style="overflow-x:auto">
+                    <div style="overflow-x:auto; -webkit-overflow-scrolling:touch">
                         <table>
                             <thead>
-                                <tr style="background:#f8fafc; color:#64748b; font-size:11px; text-transform:uppercase; letter-spacing:0.05em">
-                                    <th style="padding:10px 12px; text-align:left; border-bottom:1px solid #e2e8f0">Tanggal</th>
-                                    <th style="padding:10px 12px; text-align:left; border-bottom:1px solid #e2e8f0">Jenis</th>
-                                    <th style="padding:10px 12px; text-align:left; border-bottom:1px solid #e2e8f0">Kategori</th>
-                                    <th style="padding:10px 12px; text-align:right; border-bottom:1px solid #e2e8f0">Nominal</th>
-                                    <th style="padding:10px 12px; text-align:left; border-bottom:1px solid #e2e8f0">Deskripsi</th>
-                                    <th style="padding:10px 12px; text-align:left; border-bottom:1px solid #e2e8f0">Timestamp</th>
-                                    <th style="padding:10px 12px; text-align:center; border-bottom:1px solid #e2e8f0">Aksi</th>
+                                <tr style="background:#f8fafc; color:#64748b; font-size:9px; text-transform:uppercase; letter-spacing:0.05em">
+                                    <th style="padding:8px 6px; text-align:left; border-bottom:1px solid #e2e8f0; white-space:nowrap">Tgl</th>
+                                    <th style="padding:8px 6px; text-align:left; border-bottom:1px solid #e2e8f0; white-space:nowrap">Jenis</th>
+                                    <th style="padding:8px 6px; text-align:left; border-bottom:1px solid #e2e8f0; min-width:60px">Kategori</th>
+                                    <th style="padding:8px 6px; text-align:right; border-bottom:1px solid #e2e8f0; white-space:nowrap">Nominal</th>
+                                    <th style="padding:8px 6px; text-align:left; border-bottom:1px solid #e2e8f0; display:none">Deskripsi</th>
+                                    <th style="padding:8px 6px; text-align:center; border-bottom:1px solid #e2e8f0; white-space:nowrap">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="tabelBody">
-                                <tr><td colspan="7" style="text-align:center; padding:24px; color:#94a3b8; font-size:13px">Memuat data...</td></tr>
+                                <tr><td colspan="6" style="text-align:center; padding:20px; color:#94a3b8; font-size:12px">Memuat data...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -493,7 +588,7 @@
     </main>
 </div>
 
-<nav class="sidebar-bg" id="mobile-nav" style="position:fixed; bottom:0; left:0; right:0; display:flex; z-index:40; border-top:1px solid rgba(255,255,255,0.08); box-shadow:0 -4px 20px rgba(0,0,0,0.3)">
+<nav class="sidebar-bg" id="mobile-nav" style="position:fixed; bottom:0; left:0; right:0; display:flex; z-index:40; border-top:1px solid rgba(255,255,255,0.08); box-shadow:0 -4px 20px rgba(0,0,0,0.3); height:70px">
     <button class="mob-btn active" data-page="dashboard" onclick="showPage('dashboard')">
         <i class="fa-solid fa-chart-pie"></i><span>Dashboard</span>
     </button>
@@ -515,7 +610,7 @@ function applyLayout() {
     document.getElementById('mobile-header').style.display = isDesktop ? 'none' : 'flex';
     document.getElementById('mobile-nav').style.display = isDesktop ? 'none' : 'flex';
     document.getElementById('main-content').style.marginLeft = isDesktop ? '220px' : '0';
-    document.getElementById('main-content').style.paddingBottom = isDesktop ? '0' : '72px';
+    document.getElementById('main-content').style.paddingBottom = isDesktop ? '0' : '70px';
     document.body.classList.toggle('has-mobile-header', !isDesktop);
 }
 applyLayout();
@@ -551,65 +646,6 @@ window.addEventListener('resize', applyLayout);
             try { localStorage.setItem(KEY, on ? '1' : '0'); } catch(e){}
         });
     }
-})();
-</script>
-
-<script>
-(function(){
-  const fab = document.getElementById('fabRefresh');
-  if(!fab) return;
-  let dragging=false, moved=false, startX=0, startY=0, origX=0, origY=0;
-  const STORAGE='fabRefreshPos';
-
-  function clamp(x,y){
-    const w=fab.offsetWidth, h=fab.offsetHeight;
-    const maxX=window.innerWidth-w-4, maxY=window.innerHeight-h-4;
-    return [Math.max(4,Math.min(x,maxX)), Math.max(4,Math.min(y,maxY))];
-  }
-  function setPos(x,y){
-    [x,y]=clamp(x,y);
-    fab.style.left=x+'px'; fab.style.top=y+'px';
-    fab.style.right='auto'; fab.style.bottom='auto';
-  }
-  try{
-    const saved=JSON.parse(localStorage.getItem(STORAGE)||'null');
-    if(saved) requestAnimationFrame(()=>setPos(saved.x,saved.y));
-  }catch(e){}
-
-  fab.addEventListener('pointerdown',e=>{
-    dragging=true; moved=false;
-    const r=fab.getBoundingClientRect();
-    origX=r.left; origY=r.top;
-    startX=e.clientX; startY=e.clientY;
-    fab.setPointerCapture(e.pointerId);
-    fab.style.transition='none';
-  });
-  fab.addEventListener('pointermove',e=>{
-    if(!dragging) return;
-    const dx=e.clientX-startX, dy=e.clientY-startY;
-    if(Math.abs(dx)>4||Math.abs(dy)>4) moved=true;
-    if(moved) setPos(origX+dx, origY+dy);
-  });
-  function endDrag(e){
-    if(!dragging) return;
-    dragging=false;
-    fab.style.transition='';
-    try{fab.releasePointerCapture(e.pointerId);}catch(_){}
-    if(moved){
-      const r=fab.getBoundingClientRect();
-      localStorage.setItem(STORAGE,JSON.stringify({x:r.left,y:r.top}));
-    }
-  }
-  fab.addEventListener('pointerup',endDrag);
-  fab.addEventListener('pointercancel',endDrag);
-  fab.addEventListener('click',e=>{
-    if(moved){e.preventDefault();e.stopPropagation();return;}
-    if(typeof refreshData==='function') refreshData();
-  });
-  window.addEventListener('resize',()=>{
-    const r=fab.getBoundingClientRect();
-    setPos(r.left,r.top);
-  });
 })();
 </script>
 
