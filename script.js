@@ -14,9 +14,61 @@ let currentUser = { email: '', isDev: false, token: '' };
 // DATA STATE
 // ==============================================
 let dataTransaksi = [];
-let daftarKategori = { Income: [], Expenses: [], Savings: [] };
+let daftarKategori = { Income: [], Expenses: [], Savings: [] }; // aggregate fallback
+let kategoriByPeriod = {}; // { "bulan-tahun": { Income:[], Expenses:[], Savings:[] } }
+let setupDraft = { Income: [], Expenses: [], Savings: [] };     // editing buffer for Setup page
 let dataBudget = [];
 let chartInstances = {};
+
+// ==============================================
+// KATEGORI PER-PERIODE HELPERS
+// ==============================================
+function periodKey(bulan, tahun) { return String(bulan) + '-' + String(tahun); }
+
+function kategoriForPeriod(bulan, tahun) {
+    const key = periodKey(bulan, tahun);
+    if (kategoriByPeriod[key]) return kategoriByPeriod[key];
+    // Fallback: periode tersimpan terdekat (prefer <= periode diminta, jika tidak ada ambil paling baru)
+    const keys = Object.keys(kategoriByPeriod);
+    if (keys.length) {
+        const arr = keys.map(k => {
+            const p = k.split('-'); return { k, b: Number(p[0]), y: Number(p[1]) };
+        }).sort((a, b) => (b.y - a.y) || (b.b - a.b));
+        const target = tahun * 100 + bulan;
+        const notFuture = arr.filter(x => (x.y * 100 + x.b) <= target);
+        const pick = notFuture[0] || arr[0];
+        return kategoriByPeriod[pick.k];
+    }
+    return daftarKategori;
+}
+
+function isPeriodSaved(bulan, tahun) { return !!kategoriByPeriod[periodKey(bulan, tahun)]; }
+
+function kategoriForFilter(jenis) {
+    const tahun = parseInt(document.getElementById('filterTahun').value);
+    const bulan = parseInt(document.getElementById('filterBulan').value);
+    if (bulan === 0) {
+        // Total Year: gabungkan semua periode di tahun tsb
+        const set = [];
+        Object.keys(kategoriByPeriod).forEach(k => {
+            const p = k.split('-'); if (Number(p[1]) !== tahun) return;
+            (kategoriByPeriod[k][jenis] || []).forEach(v => { if (v && set.indexOf(v) === -1) set.push(v); });
+        });
+        if (!set.length) return daftarKategori[jenis] || [];
+        return set;
+    }
+    return (kategoriForPeriod(bulan, tahun)[jenis]) || [];
+}
+
+function aggregateKategori(map) {
+    const out = { Income: [], Expenses: [], Savings: [] };
+    Object.keys(map).forEach(k => {
+        ['Income', 'Expenses', 'Savings'].forEach(j => {
+            (map[k][j] || []).forEach(v => { if (v && out[j].indexOf(v) === -1) out[j].push(v); });
+        });
+    });
+    return out;
+}
 
 // ==============================================
 // CONSTANTS
@@ -244,7 +296,12 @@ async function loadData() {
         const result = await apiGet('getData');
         if (result.status === 'success') {
             dataTransaksi = result.data || [];
-            if (result.kategori) daftarKategori = result.kategori;
+            if (result.kategoriByPeriod) {
+                kategoriByPeriod = result.kategoriByPeriod;
+                daftarKategori = aggregateKategori(kategoriByPeriod);
+            } else if (result.kategori) {
+                daftarKategori = result.kategori;
+            }
             if (result.budget) dataBudget = result.budget;
             populateTahunFilter();
             renderDashboard();
@@ -383,7 +440,7 @@ function renderDashboard() {
 
 function renderBreakdown(jenis, filtered) {
     const c = JENIS_COLOR[jenis];
-    const categories = daftarKategori[jenis] || [];
+    const categories = kategoriForFilter(jenis);
     const actuals = {};
     filtered.filter(i => i.Jenis === jenis).forEach(i => {
         actuals[i.Kategori] = (actuals[i.Kategori] || 0) + Number(i.Nominal);
@@ -540,11 +597,32 @@ function makeMonthlyBar(filtered) {
 // ==============================================
 function renderSetup() {
     ensureSetupPeriodOptions();
+    const bulan = parseInt(document.getElementById('setupBulan').value) || 0;
+    const tahun = parseInt(document.getElementById('setupTahun').value) || 0;
+    const key = periodKey(bulan, tahun);
+    const saved = !!kategoriByPeriod[key];
+    const src = kategoriForPeriod(bulan, tahun) || { Income: [], Expenses: [], Savings: [] };
+    // Draft: kalau periode ini sudah pernah disimpan, tampilkan persis apa yang tersimpan.
+    // Kalau belum, isi dengan fallback (periode tersimpan terdekat) sebagai default awal.
+    setupDraft = {
+        Income:   Array.isArray(src.Income)   ? src.Income.slice()   : [],
+        Expenses: Array.isArray(src.Expenses) ? src.Expenses.slice() : [],
+        Savings:  Array.isArray(src.Savings)  ? src.Savings.slice()  : []
+    };
+    const infoEl = document.getElementById('setupSourceInfo');
+    if (infoEl) {
+        if (saved) {
+            infoEl.innerHTML = '<span style="color:#16a34a; font-weight:600"><i class="fa-solid fa-circle-check"></i> Tersimpan untuk ' + MONTHS_FULL[bulan - 1] + ' ' + tahun + '</span>';
+        } else {
+            infoEl.innerHTML = '<span style="color:#d97706; font-weight:600"><i class="fa-solid fa-circle-exclamation"></i> Default (belum disimpan untuk ' + MONTHS_FULL[bulan - 1] + ' ' + tahun + ')</span>';
+        }
+    }
     ['Income', 'Expenses', 'Savings'].forEach(j => {
         const el = document.getElementById('setup-' + j.toLowerCase());
-        el.innerHTML = (daftarKategori[j] || []).map((kat, idx) => `
+        if (!el) return;
+        el.innerHTML = (setupDraft[j] || []).map((kat, idx) => `
             <div style="display:flex; align-items:center; gap:6px">
-                <input type="text" value="${kat}" data-jenis="${j}" data-idx="${idx}"
+                <input type="text" value="${String(kat).replace(/"/g, '&quot;')}" data-jenis="${j}" data-idx="${idx}" oninput="onSetupInput('${j}', ${idx}, this.value)"
                     style="flex:1; border:1px solid #e2e8f0; padding:6px 10px; border-radius:6px; font-size:13px; outline:none">
                 <button onclick="removeKategori('${j}', ${idx})" style="background:#fef2f2; color:#dc2626; border:none; border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:11px">
                     <i class="fa-solid fa-trash"></i>
@@ -553,8 +631,9 @@ function renderSetup() {
         `).join('');
     });
 }
-function addKategori(j) { (daftarKategori[j] = daftarKategori[j] || []).push(''); renderSetup(); }
-function removeKategori(j, idx) { daftarKategori[j].splice(idx, 1); renderSetup(); }
+function onSetupInput(j, idx, val) { if (!setupDraft[j]) setupDraft[j] = []; setupDraft[j][idx] = val; }
+function addKategori(j) { (setupDraft[j] = setupDraft[j] || []).push(''); renderSetup(); }
+function removeKategori(j, idx) { setupDraft[j].splice(idx, 1); renderSetup(); }
 function collectSetup() {
     const out = { Income: [], Expenses: [], Savings: [] };
     ['Income', 'Expenses', 'Savings'].forEach(j => {
@@ -567,16 +646,26 @@ function collectSetup() {
 }
 async function saveSetup() {
     const values = collectSetup();
-    daftarKategori = values;
     const bulan = parseInt(document.getElementById('setupBulan').value) || 0;
     const tahun = parseInt(document.getElementById('setupTahun').value) || 0;
-    showSaving('Menyimpan kategori...');
+    if (!bulan || !tahun) { showToast('Pilih Bulan & Tahun dulu.', true); return; }
+    showSaving('Menyimpan kategori untuk ' + MONTHS_FULL[bulan - 1] + ' ' + tahun + '...');
     try {
         const res = await apiPost({ action: 'updateSetup', Bulan: bulan, Tahun: tahun, ...values });
         if (res.status === 'success') {
-            showToast('\u2713 Kategori tersimpan!');
+            // Tandai periode ini sebagai tersimpan supaya tidak balik ke default.
+            kategoriByPeriod[periodKey(bulan, tahun)] = {
+                Income: values.Income.slice(),
+                Expenses: values.Expenses.slice(),
+                Savings: values.Savings.slice()
+            };
+            daftarKategori = aggregateKategori(kategoriByPeriod);
+            showToast('\u2713 Kategori tersimpan untuk ' + MONTHS_FULL[bulan - 1] + ' ' + tahun);
+            renderSetup();
             populateKategoriDropdown(document.getElementById('inputJenis').value);
             renderBudgetPlanning();
+            renderDashboard();
+            renderSisaAnggaran();
         } else { showToast('Gagal: ' + res.message, true); }
     } catch (err) { showToast('Error: ' + err.message, true); }
     finally { hideSaving(); }
@@ -600,7 +689,8 @@ function renderBudgetPlanning() {
     ensureBudgetPeriodOptions();
     const { bulan, tahun } = getSelectedBudgetPeriod();
     const incomeActuals = getActualByCategory('Income', bulan, tahun);
-    const incomeCats = [...new Set([...(daftarKategori.Income || []), ...Object.keys(incomeActuals)])];
+    const periodCats = kategoriForPeriod(bulan, tahun) || { Income: [], Expenses: [], Savings: [] };
+    const incomeCats = [...new Set([...(periodCats.Income || []), ...Object.keys(incomeActuals)])];
     const totalIncome = incomeCats.reduce((s, k) => s + (incomeActuals[k] || 0), 0);
     const cInc = JENIS_COLOR.Income;
     document.getElementById('budget-income').innerHTML = `
@@ -621,7 +711,7 @@ function renderBudgetPlanning() {
     `;
     ['Expenses', 'Savings'].forEach(jenis => {
         const c = JENIS_COLOR[jenis];
-        const cats = daftarKategori[jenis] || [];
+        const cats = periodCats[jenis] || [];
         const label = jenis === 'Savings' ? 'Savings (Tabungan)' : jenis;
         document.getElementById('budget-' + jenis.toLowerCase()).innerHTML = `
             <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
@@ -719,7 +809,7 @@ function renderSisaAnggaran() {
     const container = document.getElementById('sisaAnggaran');
     if (!container) return;
     const { bulan, tahun } = getTrackingPeriod();
-    const cats = daftarKategori.Expenses || [];
+    const cats = kategoriForPeriod(bulan, tahun).Expenses || [];
     const titleEl = document.getElementById('sisaAnggaranTitle');
     if (titleEl) titleEl.textContent = `Sisa Anggaran Expenses (${MONTHS_FULL[bulan - 1]} ${tahun})`;
     const actuals = {};
@@ -781,7 +871,9 @@ function renderTabel(data) {
 // ==============================================
 function populateKategoriDropdown(jenis, selected) {
     const sel = document.getElementById('inputKategori');
-    const list = daftarKategori[jenis] || [];
+    // Ambil kategori sesuai periode Tanggal transaksi (kalau belum tersimpan -> fallback ke periode terdekat)
+    const { bulan, tahun } = getTrackingPeriod();
+    const list = (kategoriForPeriod(bulan, tahun)[jenis]) || [];
     sel.innerHTML = '<option value="">-- Pilih Kategori --</option>' + list.map(k => `<option value="${k}" ${k === selected ? 'selected' : ''}>${k}</option>`).join('');
 }
 function warnaiJenis(jenis) {
@@ -790,7 +882,11 @@ function warnaiJenis(jenis) {
     sel.style.background = c.light; sel.style.color = c.text; sel.style.borderColor = c.border;
 }
 document.getElementById('inputJenis').addEventListener('change', function () { populateKategoriDropdown(this.value); warnaiJenis(this.value); });
-document.getElementById('inputTanggal').addEventListener('change', renderSisaAnggaran);
+document.getElementById('inputTanggal').addEventListener('change', function () {
+    // Ganti tanggal -> ganti periode -> kategori mungkin berbeda
+    populateKategoriDropdown(document.getElementById('inputJenis').value, document.getElementById('inputKategori').value);
+    renderSisaAnggaran();
+});
 const inputNominal = document.getElementById('inputNominal');
 inputNominal.addEventListener('input', function () { const raw = this.value.replace(/\D/g, ''); this.dataset.raw = raw; this.value = raw ? formatNum(raw) : ''; });
 const getNominalRaw = () => inputNominal.dataset.raw || inputNominal.value.replace(/\D/g, '');
