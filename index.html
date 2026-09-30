@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="logo.png">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -215,6 +216,76 @@
         }
         body.dark .pbar { background:#334155; }
         body.dark table thead tr { background:#1e293b !important; }
+
+        /* ================= iOS DARK REDESIGN ================= */
+        :root { --sidebar:#0a0a0a; --sidebar-active:rgba(74,138,244,.16); --card:#1c1c1e; --card2:#2c2c2e; --blue:#4a8af4; --muted:#8e8e93; }
+        body, body.dark { font-family:'Inter',-apple-system,'SF Pro Rounded',system-ui,sans-serif; background:#000 !important; color:#fff; -webkit-font-smoothing:antialiased; }
+        body.has-mobile-header { padding-top:74px; }
+        .nav-link.active { color:var(--blue); }
+
+        /* Header: pill kiri + pill kanan */
+        #mobile-header { background:linear-gradient(#000 60%,rgba(0,0,0,0)) !important; box-shadow:none !important; padding:12px 16px 10px !important; }
+        
+        #mobile-header .brand-pill { display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid rgba(255,255,255,.08); border-radius:999px; padding:10px 20px 10px 12px; color:#fff; font-weight:800; font-size:15px; }
+        #mobile-header .brand-pill img { width:22px; height:22px; border-radius:6px; object-fit:cover; }
+        #mobilePageTitle, #darkToggle { display:none !important; }
+        #mobile-header .hdr-group { margin-left:auto; display:flex; align-items:center; background:var(--card); border:1px solid rgba(255,255,255,.08); border-radius:999px; padding:0 6px; height:42px; }
+        .hdr-btn { background:transparent !important; width:38px; height:38px; font-size:16px; color:#fff; }
+        .hdr-btn:first-child { color:var(--blue); }
+
+        /* Judul halaman besar */
+        .page { padding:8px 16px 24px !important; }
+        .page h2 { font-size:34px !important; font-weight:800 !important; color:#fff !important; letter-spacing:-.5px; margin-bottom:6px !important; }
+        .page p, .page label { color:var(--muted); }
+
+        /* Kartu */
+        body [style*="background:white"], body [style*="background: white"] { background:var(--card) !important; }
+        body [style*="background:#f8fafc"], body [style*="background:#f1f5f9"] { background:var(--card2) !important; }
+        body [style*="border:1px solid #e2e8f0"], body [style*="border:1px solid #f1f5f9"] { border:none !important; }
+        body [style*="border-radius:12px"] { border-radius:24px !important; }
+        body [style*="border-radius:10px"] { border-radius:20px !important; }
+        body [style*="border-radius:8px"], body [style*="border-radius:7px"] { border-radius:14px !important; }
+        body [style*="color:#0f172a"], body [style*="color:#1e293b"] { color:#fff !important; }
+        body [style*="color:#64748b"], body [style*="color:#475569"], body [style*="color:#94a3b8"] { color:var(--muted) !important; }
+        body [style*="border-bottom:1px solid"] { border-bottom-color:rgba(255,255,255,.07) !important; }
+        table thead tr, body.dark table thead tr { background:transparent !important; }
+        td, th { border-color:rgba(255,255,255,.07) !important; }
+        body button[style*="background:#2563eb"], body button[style*="background:#3b82f6"] { background:var(--blue) !important; }
+        body button[style*="border-radius:14px"] { border-radius:999px !important; }
+        body input, body select, body textarea, body.dark input, body.dark select, body.dark textarea { background:var(--card2) !important; color:#fff !important; border:none !important; border-radius:14px !important; }
+        .pbar, body.dark .pbar { height:9px; background:var(--card2); border-radius:6px; }
+        .pbar-fill { border-radius:6px; }
+
+        /* Kartu statistik ala referensi (blob ikon di kanan) */
+        .stat-card { position:relative; background:var(--card) !important; border:none !important; border-radius:26px !important; padding:16px 14px !important; min-height:72px; color:#fff !important; }
+        .stat-card .stat-label { color:var(--muted) !important; opacity:1; font-size:12px; font-weight:600; }
+        .stat-card .stat-label span { position:relative; z-index:2; }
+        .stat-card .stat-value { position:relative; z-index:2; color:#fff !important; font-size:15px; font-weight:800; }
+        .stat-card .stat-label i { position:absolute; right:-2px; top:-2px; width:68px; height:62px; display:flex !important; align-items:center; justify-content:center; font-size:26px; color:#fff !important; border-radius:42% 26% 30% 46%; background:linear-gradient(#7db4ff,#4a8af4); }
+        .stat-card:nth-child(2) .stat-label i { background:linear-gradient(#d4d6da,#9a9ea6); }
+        .stat-card:nth-child(3) .stat-label i { background:linear-gradient(#8fe0a6,#3fb968); }
+        .stat-card:nth-child(4) .stat-label i { background:linear-gradient(#c3a6ff,#8a63e8); }
+
+        /* Bottom nav mengambang */
+        #mobile-nav { left:16px !important; right:16px !important; bottom:calc(14px + env(safe-area-inset-bottom)) !important; height:66px !important; background:rgba(28,28,30,.92) !important; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,.1) !important; border-radius:999px; padding:5px; gap:2px; box-shadow:0 10px 30px rgba(0,0,0,.6) !important; }
+        .mob-btn { color:#fff; font-size:11px; font-weight:700; border-radius:999px; gap:4px; }
+        .mob-btn i { font-size:20px; }
+        .mob-btn.active { background:#0a0a0a; color:var(--blue) !important; }
+        #main-content { padding-bottom:100px !important; }
+        #toast { bottom:100px; background:var(--card2); border-radius:14px; }
+
+        /* Modal login & overlay */
+        #authModal { background:#000; }
+        #authModal .card, #savingOverlay .box { background:var(--card); border-radius:28px; }
+        #authModal h1, #savingOverlay p { color:#fff; }
+        #authModal .primary { background:var(--blue); border-radius:999px; }
+        #authModal input[type=password], #authModal input[type=email] { background:var(--card2) !important; color:#fff !important; border:none !important; border-radius:14px !important; }
+        #savingOverlay .ring { border-color:var(--card2); border-top-color:var(--blue); }
+
+        /* Sidebar desktop */
+        #sidebar-desktop { border-right:1px solid rgba(255,255,255,.08); }
+        .nav-link { border-radius:999px; }
+        @media (min-width:768px){ .page{ max-width:900px; margin:0 auto; } }
     </style>
 </head>
 <body>
@@ -305,15 +376,14 @@
 
     <main id="main-content" style="flex:1; overflow-y:auto; padding-bottom:70px; width:100%">
 
-        <header class="sidebar-bg" id="mobile-header" style="display:flex; align-items:center; gap:6px; padding:10px; z-index:30; box-shadow:0 2px 8px rgba(0,0,0,0.3)">
-            <div style="width:28px; height:28px; border-radius:7px; overflow:hidden; display:flex; align-items:center; justify-content:center; flex-shrink:0">
-                <img src="logo.png" alt="MyBudget" style="width:28px; height:28px; object-fit:cover; border-radius:7px">
+        <header class="sidebar-bg" id="mobile-header" style="display:flex; align-items:center; gap:6px; padding:10px; z-index:30">
+            <div class="brand-pill"><img src="logo.png" alt=""><span>MyBudget</span></div>
+            <span id="mobilePageTitle">Dashboard</span>
+            <button id="darkToggle" class="dark-toggle" aria-label="Toggle dark mode"><span class="knob"><i class="fa-solid fa-moon"></i></span></button>
+            <div class="hdr-group">
+                <button id="headerRefresh" class="hdr-btn" title="Refresh data" aria-label="Refresh"><i class="fa-solid fa-arrows-rotate"></i></button>
+                <button onclick="doLogout()" class="hdr-btn" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
             </div>
-            <span style="color:white; font-weight:700; font-size:14px; min-width:0">MyBudget</span>
-            <span id="mobilePageTitle" style="color:#64748b; font-size:11px; margin-left:auto; margin-right:4px; white-space:nowrap; flex-shrink:0">Dashboard</span>
-            <button id="headerRefresh" class="hdr-btn" title="Refresh data" aria-label="Refresh"><i class="fa-solid fa-arrows-rotate"></i></button>
-            <button id="darkToggle" class="dark-toggle" title="Toggle dark mode" aria-label="Toggle dark mode"><span class="knob"><i class="fa-solid fa-sun"></i></span></button>
-            <button onclick="doLogout()" class="hdr-btn" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
         </header>
 
         <!-- ============ PAGE: DASHBOARD ============ -->
@@ -621,13 +691,15 @@
 </nav>
 
 <script>
+document.body.classList.add('dark');
+if (window.Chart) { Chart.defaults.color = '#8e8e93'; Chart.defaults.borderColor = '#2c2c2e'; Chart.defaults.font.family = 'Inter, sans-serif'; }
 function applyLayout() {
     const isDesktop = window.innerWidth >= 768;
     document.getElementById('sidebar-desktop').style.display = isDesktop ? 'flex' : 'none';
     document.getElementById('mobile-header').style.display = isDesktop ? 'none' : 'flex';
     document.getElementById('mobile-nav').style.display = isDesktop ? 'none' : 'flex';
     document.getElementById('main-content').style.marginLeft = isDesktop ? '220px' : '0';
-    document.getElementById('main-content').style.paddingBottom = isDesktop ? '0' : '70px';
+    document.getElementById('main-content').style.paddingBottom = isDesktop ? '0' : '100px';
     document.body.classList.toggle('has-mobile-header', !isDesktop);
 }
 applyLayout();
@@ -653,8 +725,8 @@ window.addEventListener('resize', applyLayout);
         document.body.classList.toggle('dark', !!on);
         if(icon){ icon.className = on ? 'fa-solid fa-moon' : 'fa-solid fa-sun'; }
     }
-    let saved = false;
-    try { saved = localStorage.getItem(KEY) === '1'; } catch(e){}
+    let saved = true;
+    try { saved = localStorage.getItem(KEY) !== '0'; } catch(e){}
     apply(saved);
     if(btn){
         btn.addEventListener('click', function(){
