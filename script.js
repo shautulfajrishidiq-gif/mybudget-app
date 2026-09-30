@@ -134,6 +134,15 @@ function hideSaving() {
     const el = document.getElementById('savingOverlay');
     if (el) el.classList.remove('show');
 }
+function btnBusy(id, on) {
+    const b = document.getElementById(id); if (!b) return;
+    if (on) { b.dataset.h = b.innerHTML; b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; b.disabled = true; }
+    else { if (b.dataset.h) b.innerHTML = b.dataset.h; b.disabled = false; }
+}
+function flagField(id) {
+    const el = document.getElementById(id), r = el && el.closest('.sh-a, .sh-row'); if (!r) return;
+    r.classList.add('bad'); setTimeout(() => r.classList.remove('bad'), 1800);
+}
 function setLoading(show) {
     document.getElementById('loadingOverlay').classList.toggle('hidden', !show);
 }
@@ -303,8 +312,8 @@ function showPage(page) {
 // ==============================================
 // LOAD DATA
 // ==============================================
-async function loadData() {
-    setLoading(true);
+async function loadData(silent) {
+    if (!silent) setLoading(true);
     try {
         const result = await apiGet('getData');
         if (result.status === 'success') {
@@ -1114,15 +1123,21 @@ function fillTxCat() {
 document.getElementById('txAmt').addEventListener('input', function () { const r = this.value.replace(/\D/g, ''); this.value = r ? Number(r).toLocaleString('id-ID') : ''; });
 async function submitTx() {
     const nominal = document.getElementById('txAmt').value.replace(/\D/g, ''), kat = document.getElementById('txCat').value, tgl = document.getElementById('txDate').value;
-    if (!nominal || !kat || !tgl) { showToast('Lengkapi nominal, kategori, dan tanggal.', true); return; }
-    const btn = document.getElementById('txGo'); btn.disabled = true; showSaving('Menyimpan transaksi...');
+    if (!nominal || Number(nominal) <= 0 || !kat || !tgl) {
+        if (!nominal || Number(nominal) <= 0) flagField('txAmt');
+        if (!kat) flagField('txCat');
+        if (!tgl) flagField('txDate');
+        showToast('Lengkapi nominal, kategori, dan tanggal.', true); return;
+    }
+    btnBusy('txGo', true); showSaving('Menyimpan transaksi...');
     try {
         const res = await apiPost({ action: txEditId ? 'update' : 'insert', ID: txEditId || '', Tanggal: tgl, Jenis: txJenis, Kategori: kat, Nominal: nominal, Deskripsi: document.getElementById('txNote').value });
         if (res.status === 'success') {
-            closeTx(); await loadData(); showToast('\u2713 Transaksi disimpan!');
+            closeTx(); showToast('\u2713 Transaksi disimpan!');
+            loadData(true);
         } else showToast('Gagal: ' + res.message, true);
     } catch (err) { showToast('Error: ' + err.message, true); }
-    finally { hideSaving(); btn.disabled = false; }
+    finally { hideSaving(); btnBusy('txGo', false); }
 }
 
 
@@ -1217,17 +1232,17 @@ function openBud(kat) {
 function closeBud() { document.getElementById('bSheet').classList.remove('open'); }
 document.getElementById('bAmt').addEventListener('input', function () { const r = this.value.replace(/\D/g, ''); this.value = r ? Number(r).toLocaleString('id-ID') : ''; });
 async function saveBudgets(list, msg) {
-    showSaving('Menyimpan budget...');
+    showSaving('Menyimpan budget...'); btnBusy('bGo', true);
     try {
         const res = await apiPost({ action: 'updateBudget', budgets: list });
         if (res.status === 'success') { dataBudget = list; closeBud(); renderBudgets(); renderOverview(); showToast(msg); }
         else showToast('Gagal: ' + res.message, true);
     } catch (err) { showToast('Error: ' + err.message, true); }
-    finally { hideSaving(); }
+    finally { hideSaving(); btnBusy('bGo', false); }
 }
 function submitBud() {
     const amt = parseInt(document.getElementById('bAmt').value.replace(/\D/g, '')) || 0, kat = document.getElementById('bCat').value;
-    if (!amt || !kat) { showToast('Lengkapi nominal dan kategori.', true); return; }
+    if (!amt || !kat) { if (!amt) flagField('bAmt'); if (!kat) flagField('bCat'); showToast('Lengkapi nominal dan kategori.', true); return; }
     const [y, m] = bMonth.split('-').map(Number); let ey = y, em = m;
     if (!budEdit && document.getElementById('bRep').value === 'm') {
         const ed = document.getElementById('bEnd').value;
@@ -1285,7 +1300,7 @@ function moveCat(i, d) { const t = i + d; if (t < 0 || t >= cDraft.length) retur
 function doneSort() { const arr = cDraft.slice(); cSort = false; saveCats(cTab, arr, '\u2713 Urutan disimpan!'); }
 async function saveCats(jn, arr, msg) {
     const [y, m] = cMonth.split('-').map(Number), v = curCats(); v[jn] = arr;
-    showSaving('Menyimpan kategori...');
+    showSaving('Menyimpan kategori...'); btnBusy('cGo', true);
     try {
         const res = await apiPost({ action: 'updateSetup', Bulan: m, Tahun: y, Income: v.Income, Expenses: v.Expenses, Savings: v.Savings });
         if (res.status === 'success') {
@@ -1294,7 +1309,7 @@ async function saveCats(jn, arr, msg) {
             closeCat(); renderSettings(); refreshViews(); renderOverview(); showToast(msg);
         } else showToast('Gagal: ' + res.message, true);
     } catch (err) { showToast('Error: ' + err.message, true); }
-    finally { hideSaving(); }
+    finally { hideSaving(); btnBusy('cGo', false); }
 }
 function openCat(i) {
     cIdx = (i === undefined) ? -1 : i;
@@ -1312,7 +1327,7 @@ function openCat(i) {
 function closeCat() { document.getElementById('cSheet').classList.remove('open'); }
 function submitCat() {
     const name = document.getElementById('cName').value.trim(), list = curCats()[cTab];
-    if (!name) { showToast('Isi nama kategori.', true); return; }
+    if (!name) { flagField('cName'); showToast('Isi nama kategori.', true); return; }
     const em = emojiMap(); em[name] = document.getElementById('cEmoji').textContent;
     if (cIdx >= 0) {
         try { localStorage.setItem('mb_emoji', JSON.stringify(em)); } catch (e) {}
