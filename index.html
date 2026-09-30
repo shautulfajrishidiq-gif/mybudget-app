@@ -286,6 +286,119 @@
         #sidebar-desktop { border-right:1px solid rgba(255,255,255,.08); }
         .nav-link { border-radius:999px; }
         @media (min-width:768px){ .page{ max-width:900px; margin:0 auto; } }
+
+        /* ===== Tahap 1: Overview, filter periode, sheet transaksi ===== */
+        #page-dashboard > div:first-child > div:last-child { display:none; }
+        .pw { position:relative; }
+        #periodBtn { display:flex; align-items:center; gap:8px; background:var(--card); border:none; border-radius:999px; padding:10px 16px; color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
+        #periodMenu { position:absolute; right:0; top:48px; width:236px; background:rgba(44,44,46,.97); backdrop-filter:blur(20px); border-radius:26px; padding:8px; z-index:60; display:none; box-shadow:0 14px 40px rgba(0,0,0,.7); }
+        #periodMenu.open { display:block; }
+        .pm-i { display:flex; gap:10px; padding:12px 14px; border-radius:16px; color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
+        .pm-i .ck { width:16px; color:var(--blue); }
+        .pm-c { padding:6px 14px 10px; display:none; gap:6px; flex-direction:column; }
+        .pm-c input { padding:8px 10px; font-size:13px; }
+        .pm-c button { background:var(--blue); color:#fff; border:none; border-radius:999px; padding:9px; font-weight:700; }
+        .ov-h { font-size:22px; font-weight:800; color:#fff; margin:22px 4px 10px; }
+        .bal, .tc, .rt { background:var(--card); border-radius:28px; }
+        .bal { padding:20px; }
+        .bal .t { color:#fff; font-weight:800; font-size:16px; }
+        .bal .v { color:#fff; font-weight:800; font-size:26px; margin:6px 0 2px; }
+        .bal .v small { color:var(--muted); font-size:12px; font-weight:600; }
+        .dsh { position:relative; border-top:2px dashed #3a3a3c; margin:16px 0; }
+        .dsh:before, .dsh:after { content:''; position:absolute; top:-12px; width:22px; height:22px; border-radius:50%; background:#000; }
+        .dsh:before { left:-31px; } .dsh:after { right:-31px; }
+        .bal .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+        .bal .two p { margin:0 0 6px; color:var(--muted); font-size:13px; font-weight:600; }
+        .bal .two b { color:#fff; font-size:13px; }
+        .bar { height:12px; border-radius:8px; background:#2c2c2e; overflow:hidden; }
+        .bar i { display:block; height:100%; border-radius:8px; }
+        .tcg { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .tc { padding:14px; }
+        .tc .n { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+        .tc .n span:first-child { font-size:28px; }
+        .tc .n div { min-width:0; } .tc .n em { display:block; font-style:normal; color:var(--muted); font-size:13px; font-weight:700; }
+        .tc .n b { color:#fff; font-size:13px; }
+        .tc small { display:block; margin-top:8px; color:var(--muted); font-size:12px; font-weight:600; }
+        .rt { padding:4px 14px; }
+        .rr { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,.07); }
+        .rr:last-child { border:none; }
+        .rr .e { font-size:30px; width:36px; text-align:center; }
+        .rr .m { flex:1; min-width:0; } .rr .m b { color:#fff; display:block; font-size:15px; }
+        .rr .m em, .rr .a em { font-style:normal; color:var(--muted); font-size:12px; font-weight:600; }
+        .rr .a { text-align:right; } .rr .a b { color:#fff; font-size:14px; display:block; }
+        .emp { color:var(--muted); text-align:center; padding:22px 0; font-size:13px; }
+        #fabAdd { position:fixed; right:20px; bottom:calc(100px + env(safe-area-inset-bottom)); width:58px; height:58px; border-radius:50%; border:none; background:linear-gradient(#6aa3ff,#3d7cf0); color:#fff; font-size:24px; z-index:45; box-shadow:0 8px 24px rgba(74,138,244,.5); }
+        #txSheet { position:fixed; inset:0; z-index:1500; background:rgba(0,0,0,.6); display:none; }
+        #txSheet.open { display:block; }
+        .sh-p { position:absolute; left:0; right:0; bottom:0; top:36px; background:#1c1c1e; border-radius:38px 38px 0 0; padding:16px 16px 40px; overflow-y:auto; animation:shUp .25s ease; }
+        @keyframes shUp { from { transform:translateY(100%); } to { transform:none; } }
+        .sh-top { display:flex; align-items:center; justify-content:space-between; }
+        .sh-top .ti { color:#fff; font-weight:800; font-size:18px; }
+        .sh-r { width:46px; height:46px; border-radius:50%; border:none; background:#3a3a3c; color:#fff; font-size:18px; }
+        .sh-r.x { color:var(--blue); }
+        .sh-e { position:relative; width:104px; height:104px; margin:22px auto 8px; border-radius:50%; background:#2c2c2e; display:flex; align-items:center; justify-content:center; font-size:48px; cursor:pointer; }
+        .sh-e i { position:absolute; right:0; bottom:0; width:30px; height:30px; border-radius:50%; background:var(--blue); font-size:12px; display:flex; align-items:center; justify-content:center; color:#fff; }
+        #emojiPick { display:none; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:10px; }
+        #emojiPick.open { display:flex; }
+        #emojiPick span { font-size:26px; padding:6px; border-radius:12px; background:#2c2c2e; cursor:pointer; }
+        .sh-c { background:#2c2c2e; border-radius:28px; padding:6px 16px; margin-bottom:6px; }
+        .sh-a { display:flex; align-items:center; gap:8px; padding:14px 0 6px; }
+        .sh-a span { color:#8e8e93; font-size:28px; font-weight:800; }
+        #txAmt { flex:1; min-width:0; background:transparent !important; border-radius:0 !important; font-size:30px; font-weight:800; color:#fff; padding:0 !important; outline:none; }
+        .seg { display:flex; background:#1c1c1e; border-radius:999px; padding:4px; margin:10px 0 12px; }
+        .seg button { flex:1; border:none; background:none; color:#fff; font-weight:700; font-size:14px; padding:11px 0; border-radius:999px; }
+        .seg button.on { background:#3a3a3c; }
+        .sh-l { color:#8e8e93; font-weight:800; font-size:15px; margin:22px 6px 8px; }
+        .sh-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,.07); }
+        .sh-row:last-child { border:none; }
+        .sh-row .ic { width:40px; height:40px; border-radius:11px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px; }
+        .sh-row b { color:#fff; font-size:16px; flex:1; }
+        .sh-row select, .sh-row input { background:transparent !important; width:auto; max-width:55%; text-align:right; color:#8e8e93 !important; font-size:15px; padding:6px !important; }
+        #txNote { width:100%; min-height:110px; background:#2c2c2e !important; border-radius:24px !important; color:#fff; padding:16px; font-size:15px; margin-top:22px; border:none; outline:none; }
+
+        /* ===== Tahap 2: History, Budgets, form budget ===== */
+        #page-tracking > :not(.ns), #page-budget > :not(.ns) { display:none !important; }
+        .hh { display:flex; align-items:center; justify-content:space-between; position:relative; }
+        .hp { display:flex; background:var(--card); border-radius:999px; height:44px; padding:0 8px; }
+        .hp button { width:42px; border:none; background:none; color:#fff; font-size:17px; }
+        .mp { position:relative; background:var(--card); border-radius:999px; padding:11px 18px; color:#fff; font-weight:700; font-size:14px; }
+        .mp input { position:absolute; inset:0; width:100% !important; height:100%; opacity:0; }
+        .g2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .stat-card.g .stat-label i { background:linear-gradient(#8fe0a6,#3fb968) !important; }
+        .stat-card.b .stat-label i { background:linear-gradient(#7db4ff,#4a8af4) !important; }
+        .mh { color:#fff; font-weight:800; font-size:16px; margin:20px 4px 8px; }
+        .srch { width:100%; margin:0 0 10px; padding:12px 16px !important; font-size:15px; }
+        .fm { position:absolute; right:0; top:50px; width:200px; background:rgba(44,44,46,.97); border-radius:24px; padding:8px; z-index:60; display:none; box-shadow:0 14px 40px rgba(0,0,0,.7); }
+        .fm.open { display:block; }
+        .tabs { display:flex; background:var(--card); border-radius:999px; padding:4px; margin:14px 0; }
+        .tabs button { flex:1; border:none; background:none; color:#fff; font-weight:700; padding:10px 0; border-radius:999px; font-size:14px; }
+        .tabs button.on { background:#3a3a3c; }
+        .rr { cursor:pointer; }
+        .bc { cursor:pointer; }
+        #bSheet { position:fixed; inset:0; z-index:1500; background:rgba(0,0,0,.6); display:none; }
+        #bSheet.open { display:block; }
+        #bAmt { flex:1; min-width:0; background:transparent !important; border-radius:0 !important; font-size:30px; font-weight:800; color:#fff; padding:0 !important; outline:none; }
+        .tg { position:relative; width:52px; height:30px; flex-shrink:0; }
+        .sh-row .tg input { position:absolute; inset:0; width:100%; max-width:none; height:100%; opacity:0; z-index:2; }
+        .tg i { position:absolute; inset:0; background:#636366; border-radius:999px; transition:.2s; }
+        .tg i:after { content:''; position:absolute; top:2px; left:2px; width:26px; height:26px; border-radius:50%; background:#fff; transition:.2s; }
+        .tg input:checked + i { background:#4a8af4; }
+        .tg input:checked + i:after { left:24px; }
+        .txdel { width:100%; margin-top:18px; border:none; border-radius:999px; padding:15px; background:#2c2c2e; color:#ff5a5f; font-weight:800; font-size:15px; display:none; }
+        .hint { color:#8e8e93; font-size:12px; margin:8px 6px 0; }
+
+        /* ===== Tahap 3: Settings & Categories ===== */
+        #page-setup > :not(.ns) { display:none !important; }
+        .av { width:52px; height:52px; border-radius:50%; background:#000; color:#fff; font-weight:800; font-size:18px; display:flex; align-items:center; justify-content:center; }
+        .sb { width:36px; height:36px; border-radius:50%; border:none; background:#3a3a3c; color:#fff; margin-left:6px; }
+        .sv { color:#8e8e93; font-size:15px; }
+        .sh-c .sh-row { cursor:pointer; }
+        #cSheet { position:fixed; inset:0; z-index:1500; background:rgba(0,0,0,.6); display:none; }
+        #cSheet.open { display:block; }
+        #cName { max-width:65%; color:#fff !important; }
+        #cPick { display:none; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:10px; }
+        #cPick.open { display:flex; }
+        #cPick span { font-size:26px; padding:6px; border-radius:12px; background:#2c2c2e; cursor:pointer; }
     </style>
 </head>
 <body>
@@ -354,16 +467,16 @@
         </div>
         <nav style="flex:1; padding:10px 0">
             <button class="nav-link active" data-page="dashboard" onclick="showPage('dashboard')">
-                <i class="fa-solid fa-chart-pie icon"></i><span>Dashboard</span>
+                <i class="fa-solid fa-chart-pie icon"></i><span>Overview</span>
             </button>
             <button class="nav-link" data-page="setup" onclick="showPage('setup')">
-                <i class="fa-solid fa-sliders icon"></i><span>Setup</span>
+                <i class="fa-solid fa-sliders icon"></i><span>Settings</span>
             </button>
             <button class="nav-link" data-page="budget" onclick="showPage('budget')">
-                <i class="fa-solid fa-coins icon"></i><span>Budget Planning</span>
+                <i class="fa-solid fa-coins icon"></i><span>Budgets</span>
             </button>
             <button class="nav-link" data-page="tracking" onclick="showPage('tracking')">
-                <i class="fa-solid fa-list-check icon"></i><span>Budget Tracking</span>
+                <i class="fa-solid fa-list-check icon"></i><span>History</span>
             </button>
         </nav>
         <div style="padding:12px; border-top:1px solid rgba(255,255,255,0.08); text-align:center">
@@ -389,7 +502,8 @@
         <!-- ============ PAGE: DASHBOARD ============ -->
         <div id="page-dashboard" class="page active" style="padding:12px">
             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px">
-                <h2 style="font-size:16px; font-weight:700; color:#0f172a; margin:0; margin-right:auto">Dashboard</h2>
+                <h2 style="font-size:16px; font-weight:700; color:#0f172a; margin:0; margin-right:auto">Overview</h2>
+                <div class="pw"><button id="periodBtn" onclick="togglePeriodMenu(event)"><span id="periodLbl">This Month</span><i class="fa-solid fa-chevron-down" style="font-size:11px"></i></button><div id="periodMenu"></div></div>
                 <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center">
                     <div style="background:white; border:1px solid #e2e8f0; border-radius:7px; padding:5px 8px; display:flex; align-items:center; gap:4px; min-width:0">
                         <span style="font-size:9px; color:#64748b; font-weight:600; white-space:nowrap">TAHUN</span>
@@ -410,6 +524,10 @@
                 </div>
             </div>
 
+            <div id="ovBal"></div>
+            <div class="ov-h">Top Categories</div><div id="ovTop"></div>
+            <div class="ov-h">Recent Transactions</div><div id="ovRec"></div>
+            <div class="ov-h">Details</div>
             <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-bottom:12px">
                 <div class="stat-card" style="background:linear-gradient(135deg,#15803d,#166534); color:white">
                     <div class="stat-label"><i class="fa-solid fa-arrow-trend-up"></i><span>Income</span></div>
@@ -472,6 +590,7 @@
 
         <!-- ============ PAGE: SETUP ============ -->
         <div id="page-setup" class="page" style="padding:12px">
+            <div class="ns" id="set"></div>
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:8px">
                 <h2 style="font-size:16px; font-weight:700; color:#0f172a; margin:0">Setup Kategori</h2>
                 <div style="display:flex; gap:6px; flex-wrap:wrap">
@@ -546,6 +665,7 @@
 
         <!-- ============ PAGE: BUDGET PLANNING ============ -->
         <div id="page-budget" class="page" style="padding:12px">
+            <div class="ns" id="bud"></div>
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:8px">
                 <h2 style="font-size:16px; font-weight:700; color:#0f172a; margin:0">Budget Planning</h2>
                 <button onclick="saveBudget()" style="background:#2563eb; color:white; border:none; padding:8px 14px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px; white-space:nowrap">
@@ -582,6 +702,7 @@
 
         <!-- ============ PAGE: BUDGET TRACKING ============ -->
         <div id="page-tracking" class="page" style="padding:12px">
+            <div class="ns" id="hist"></div>
             <h2 style="font-size:16px; font-weight:700; color:#0f172a; margin:0 0 14px">Budget Tracking</h2>
 
             <div style="display:grid; grid-template-columns:1fr; gap:10px">
@@ -675,21 +796,49 @@
     </main>
 </div>
 
-<nav class="sidebar-bg" id="mobile-nav" style="position:fixed; bottom:0; left:0; right:0; display:flex; z-index:40; border-top:1px solid rgba(255,255,255,0.08); box-shadow:0 -4px 20px rgba(0,0,0,0.3); height:70px">
-    <button class="mob-btn active" data-page="dashboard" onclick="showPage('dashboard')">
-        <i class="fa-solid fa-chart-pie"></i><span>Dashboard</span>
-    </button>
-    <button class="mob-btn" data-page="setup" onclick="showPage('setup')">
-        <i class="fa-solid fa-sliders"></i><span>Setup</span>
-    </button>
-    <button class="mob-btn" data-page="budget" onclick="showPage('budget')">
-        <i class="fa-solid fa-coins"></i><span>Planning</span>
-    </button>
-    <button class="mob-btn" data-page="tracking" onclick="showPage('tracking')">
-        <i class="fa-solid fa-list-check"></i><span>Tracking</span>
-    </button>
+<nav class="sidebar-bg" id="mobile-nav" style="position:fixed; bottom:0; left:0; right:0; display:flex; z-index:40; height:70px">
+    <button class="mob-btn active" data-page="dashboard" onclick="showPage('dashboard')"><i class="fa-solid fa-table-cells-large"></i><span>Overview</span></button>
+    <button class="mob-btn" data-page="tracking" onclick="showPage('tracking')"><i class="fa-solid fa-calendar-days"></i><span>History</span></button>
+    <button class="mob-btn" data-page="budget" onclick="showPage('budget')"><i class="fa-solid fa-inbox"></i><span>Budgets</span></button>
+    <button class="mob-btn" data-page="setup" onclick="showPage('setup')"><i class="fa-solid fa-gear"></i><span>Settings</span></button>
 </nav>
 
+<button id="fabAdd" onclick="fabAction()" aria-label="Tambah transaksi"><i class="fa-solid fa-plus"></i></button>
+<div id="txSheet"><div class="sh-p">
+  <div class="sh-top"><button class="sh-r x" onclick="closeTx()"><i class="fa-solid fa-xmark"></i></button><div class="ti" id="txTitle">New Transaction</div><button class="sh-r" id="txGo" onclick="submitTx()"><i class="fa-solid fa-arrow-up"></i></button></div>
+  <div class="sh-e" onclick="document.getElementById('emojiPick').classList.toggle('open')"><span id="txEmoji">🛒</span><i class="fa-solid fa-pencil"></i></div>
+  <div id="emojiPick"></div>
+  <div class="sh-c"><div class="sh-a"><span>IDR</span><input id="txAmt" inputmode="numeric" placeholder="0" autocomplete="off"></div>
+    <div class="seg" id="txSeg"><button data-j="Expenses" onclick="setTxJenis('Expenses')">Expense</button><button data-j="Income" onclick="setTxJenis('Income')">Income</button><button data-j="Savings" onclick="setTxJenis('Savings')">Savings</button></div></div>
+  <div class="sh-l">Assignment</div>
+  <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#4a8af4"><i class="fa-solid fa-tag"></i></span><b>Category</b><select id="txCat"></select></label></div>
+  <div class="sh-l">Schedule</div>
+  <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#5b8def"><i class="fa-solid fa-calendar"></i></span><b>Date</b><input type="date" id="txDate" onchange="fillTxCat()"></label></div>
+  <textarea id="txNote" placeholder="Notes (optional)"></textarea>
+  <button class="txdel" id="txDel" onclick="delTx()">Delete Transaction</button>
+</div></div>
+<div id="bSheet"><div class="sh-p">
+  <div class="sh-top"><button class="sh-r x" onclick="closeBud()"><i class="fa-solid fa-xmark"></i></button><div class="ti" id="bTitle">New Budget</div><button class="sh-r" id="bGo" onclick="submitBud()"><i class="fa-solid fa-arrow-up"></i></button></div>
+  <div class="sh-e" style="cursor:default"><span id="bEmoji">&#128176;</span></div>
+  <div class="sh-c"><div class="sh-a"><span>IDR</span><input id="bAmt" inputmode="numeric" placeholder="0" autocomplete="off"></div>
+    <div class="seg" id="bSeg"><button data-j="Expenses" onclick="setBudJenis('Expenses')">Expense</button><button data-j="Savings" onclick="setBudJenis('Savings')">Savings</button></div></div>
+  <div class="sh-l">Assignment</div>
+  <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#4a8af4"><i class="fa-solid fa-tag"></i></span><b>Category</b><select id="bCat" onchange="document.getElementById('bEmoji').textContent=emojiFor(this.value,budJenis)"></select></label></div>
+  <div id="bInterval"><div class="sh-l">Interval</div>
+  <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#7b6fe8"><i class="fa-solid fa-rotate"></i></span><b>Repeat</b><select id="bRep"><option value="m">Monthly</option><option value="o">Once</option></select></label>
+  <label class="sh-row"><span class="ic" style="background:#7b6fe8"><i class="fa-solid fa-flag"></i></span><b>End Date</b><span class="tg"><input type="checkbox" id="bEndOn" onchange="document.getElementById('bEndRow').style.display=this.checked?'flex':'none'"><i></i></span></label>
+  <label class="sh-row" id="bEndRow" style="display:none"><span class="ic" style="background:#7b6fe8"><i class="fa-solid fa-calendar"></i></span><b>Until</b><input type="date" id="bEnd"></label></div>
+  <p class="hint">Tanpa End Date, budget berlaku sampai Desember tahun ini.</p></div>
+  <button class="txdel" id="bDel" onclick="delBud()">Delete Budget</button>
+</div></div>
+<div id="cSheet"><div class="sh-p" style="top:auto; max-height:88%">
+  <div class="sh-top"><button class="sh-r x" onclick="closeCat()"><i class="fa-solid fa-xmark"></i></button><div class="ti" id="cTitle">New Category</div><button class="sh-r" onclick="submitCat()"><i class="fa-solid fa-arrow-up"></i></button></div>
+  <div class="sh-e" onclick="document.getElementById('cPick').classList.toggle('open')"><span id="cEmoji">&#128176;</span><i class="fa-solid fa-pencil"></i></div>
+  <div id="cPick"></div>
+  <div class="sh-c"><label class="sh-row"><b>Name</b><input id="cName" placeholder="e.g. Groceries" autocomplete="off"></label></div>
+  <p class="hint" id="cHint"></p>
+  <button class="txdel" id="cDel" onclick="delCat()">Delete Category</button>
+</div></div>
 <script>
 document.body.classList.add('dark');
 if (window.Chart) { Chart.defaults.color = '#8e8e93'; Chart.defaults.borderColor = '#2c2c2e'; Chart.defaults.font.family = 'Inter, sans-serif'; }
