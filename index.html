@@ -76,7 +76,7 @@
         
         #toast { 
             position: fixed; bottom: 80px; right: 16px; background: #1e293b; color: white; 
-            padding: 10px 14px; border-radius: 10px; font-size: 12px; z-index: 999; 
+            padding: 10px 14px; border-radius: 10px; font-size: 12px; z-index: 3100; 
             opacity: 0; transition: opacity 0.3s; pointer-events: none; 
         }
         #toast.show { opacity: 1; }
@@ -109,7 +109,7 @@
         @media (min-width: 768px) { #fabRefresh { bottom: 24px; } }
 
         #savingOverlay { 
-            position: fixed; inset:0; background: rgba(15,23,42,0.55); z-index: 1000; 
+            position: fixed; inset:0; background: rgba(15,23,42,0.55); z-index: 3000; 
             display:none; align-items:center; justify-content:center; backdrop-filter: blur(2px); 
         }
         #savingOverlay.show { display:flex; animation: fadeIn 0.15s ease; }
@@ -335,6 +335,10 @@
         .sh-top .ti { color:#fff; font-weight:800; font-size:18px; }
         .sh-r { width:46px; height:46px; border-radius:50%; border:none; background:#3a3a3c; color:#fff; font-size:18px; }
         .sh-r.x { color:var(--blue); }
+        .sh-r.go { background:var(--blue); color:#fff; box-shadow:0 4px 14px rgba(74,138,244,.45); }
+        .sh-r.go:active { transform:scale(.93); }
+        .sh-r.go:disabled { opacity:.75; }
+        .bad { box-shadow:inset 0 0 0 1.5px #e5484d; border-radius:16px; }
         .sh-e { position:relative; width:104px; height:104px; margin:22px auto 8px; border-radius:50%; background:#2c2c2e; display:flex; align-items:center; justify-content:center; font-size:48px; cursor:pointer; }
         .sh-e i { position:absolute; right:0; bottom:0; width:30px; height:30px; border-radius:50%; background:var(--blue); font-size:12px; display:flex; align-items:center; justify-content:center; color:#fff; }
         .sh-c { background:#2c2c2e; border-radius:28px; padding:6px 16px; margin-bottom:6px; }
@@ -748,7 +752,7 @@
 
 <button id="fabAdd" onclick="fabAction()" aria-label="Tambah transaksi"><i class="fa-solid fa-plus"></i></button>
 <div id="txSheet"><div class="sh-p">
-  <div class="sh-top"><button class="sh-r x" onclick="closeTx()"><i class="fa-solid fa-xmark"></i></button><div class="ti" id="txTitle">New Transaction</div><button class="sh-r" id="txGo" onclick="submitTx()"><i class="fa-solid fa-arrow-up"></i></button></div>
+  <div class="sh-top"><button class="sh-r x" onclick="closeTx()"><i class="fa-solid fa-xmark"></i></button><div class="ti" id="txTitle">New Transaction</div><button class="sh-r go" id="txGo" onclick="submitTx()"><i class="fa-solid fa-arrow-up"></i></button></div>
   <div class="sh-e" style="cursor:default"><span id="txEmoji">🛒</span></div>
   <div class="sh-c"><div class="sh-a"><span>IDR</span><input id="txAmt" inputmode="numeric" placeholder="0" autocomplete="off"></div>
     <div class="seg" id="txSeg"><button data-j="Expenses" onclick="setTxJenis('Expenses')">Expense</button><button data-j="Income" onclick="setTxJenis('Income')">Income</button><button data-j="Savings" onclick="setTxJenis('Savings')">Savings</button></div></div>
@@ -760,7 +764,7 @@
   <button class="txdel" id="txDel" onclick="delTx()">Delete Transaction</button>
 </div></div>
 <div id="bSheet"><div class="sh-p">
-  <div class="sh-top"><button class="sh-r x" onclick="closeBud()"><i class="fa-solid fa-xmark"></i></button><div class="ti" id="bTitle">New Budget</div><button class="sh-r" id="bGo" onclick="submitBud()"><i class="fa-solid fa-arrow-up"></i></button></div>
+  <div class="sh-top"><button class="sh-r x" onclick="closeBud()"><i class="fa-solid fa-xmark"></i></button><div class="ti" id="bTitle">New Budget</div><button class="sh-r go" id="bGo" onclick="submitBud()"><i class="fa-solid fa-arrow-up"></i></button></div>
   <div class="sh-e" style="cursor:default"><span id="bEmoji">&#128176;</span></div>
   <div class="sh-c"><div class="sh-a"><span>IDR</span><input id="bAmt" inputmode="numeric" placeholder="0" autocomplete="off"></div>
     <div class="seg" id="bSeg"><button data-j="Expenses" onclick="setBudJenis('Expenses')">Expense</button><button data-j="Savings" onclick="setBudJenis('Savings')">Savings</button></div></div>
@@ -774,7 +778,7 @@
   <button class="txdel" id="bDel" onclick="delBud()">Delete Budget</button>
 </div></div>
 <div id="cSheet"><div class="sh-p" style="top:auto; max-height:88%">
-  <div class="sh-top"><button class="sh-r x" onclick="closeCat()"><i class="fa-solid fa-xmark"></i></button><div class="ti" id="cTitle">New Category</div><button class="sh-r" onclick="submitCat()"><i class="fa-solid fa-arrow-up"></i></button></div>
+  <div class="sh-top"><button class="sh-r x" onclick="closeCat()"><i class="fa-solid fa-xmark"></i></button><div class="ti" id="cTitle">New Category</div><button class="sh-r go" id="cGo" onclick="submitCat()"><i class="fa-solid fa-arrow-up"></i></button></div>
   <div class="sh-e" onclick="document.getElementById('cPick').classList.toggle('open')"><span id="cEmoji">&#128176;</span><i class="fa-solid fa-pencil"></i></div>
   <div id="cPick"></div>
   <div class="sh-c"><label class="sh-row"><b>Name</b><input id="cName" placeholder="e.g. Groceries" autocomplete="off"></label></div>
