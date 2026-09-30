@@ -280,7 +280,7 @@ document.getElementById('authForm').addEventListener('submit', async function (e
 // ==============================================
 // PAGE NAVIGATION
 // ==============================================
-const PAGE_TITLES = { dashboard: 'Dashboard', setup: 'Setup', budget: 'Budget Planning', tracking: 'Tracking' };
+const PAGE_TITLES = { dashboard: 'Overview', setup: 'Settings', budget: 'Budgets', tracking: 'History' };
 
 function showPage(page) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -294,9 +294,10 @@ function showPage(page) {
     const titleEl = document.getElementById('mobilePageTitle');
     if (titleEl) titleEl.textContent = PAGE_TITLES[page] || page;
     if (page === 'dashboard') renderDashboard();
-    if (page === 'setup') renderSetup();
-    if (page === 'budget') renderBudgetPlanning();
-    if (page === 'tracking') renderSisaAnggaran();
+    if (page === 'setup') { sView = 'main'; cSort = false; renderSettings(); }
+    const fb = document.getElementById('fabAdd'); if (fb) fb.style.display = page === 'setup' ? 'none' : '';
+    if (page === 'budget') renderBudgets();
+    if (page === 'tracking') renderHistory();
 }
 
 // ==============================================
@@ -435,7 +436,7 @@ function getBudgetForFilter(jenis, kategori) {
 // DASHBOARD
 // ==============================================
 function renderDashboard() {
-    const filtered = getFilteredData();
+    const filtered = getOverviewData();
     let totIncome = 0, totExp = 0, totSav = 0;
     filtered.forEach(i => {
         const n = Number(i.Nominal);
@@ -452,6 +453,7 @@ function renderDashboard() {
     renderBreakdown('Expenses', filtered);
     renderBreakdown('Savings', filtered);
     renderDashboardCharts(filtered);
+    renderOverview();
 }
 
 function renderBreakdown(jenis, filtered) {
@@ -1172,3 +1174,302 @@ warnaiJenis('Income');
         showToast('Error startup: ' + err.message, true);
     }
 })();
+
+// ==============================================
+// TAHAP 1: OVERVIEW, FILTER PERIODE, SHEET TRANSAKSI
+// ==============================================
+let txEditId = '', ovPeriod = 'month', ovFrom = '', ovTo = '', txJenis = 'Expenses';
+const EMO = { Income: '\u{1F4BC}', Expenses: '\u{1F6D2}', Savings: '\u{1F3E6}' };
+const EMOJIS = ['\u{1F6D2}','\u2615','\u{1F37D}\uFE0F','\u{1F6F5}','\u{1F697}','\u{1F687}','\u26FD','\u{1F3E0}','\u{1F4A1}','\u{1F4F1}','\u{1F3AC}','\u{1F381}','\u{1F48A}','\u{1F4DA}','\u2708\uFE0F','\u{1F455}','\u{1F4BC}','\u{1F3E6}','\u{1F4B0}','\u{1F437}'];
+const PERIODS = [['today','Today'],['week','This Week'],['month','This Month'],['all','All Time'],['custom','Custom']];
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function idr(n) { return 'IDR ' + Math.round(n).toLocaleString('id-ID'); }
+function emojiMap() { try { return JSON.parse(localStorage.getItem('mb_emoji') || '{}'); } catch (e) { return {}; } }
+function emojiFor(k, jn) { return emojiMap()[k] || EMO[jn] || '\u{1F4B0}'; }
+function ovRange() {
+    const n = new Date(), t = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+    if (ovPeriod === 'today') return [t, t];
+    if (ovPeriod === 'week') { const s = new Date(t); s.setDate(t.getDate() - (t.getDay() + 6) % 7); const e = new Date(s); e.setDate(s.getDate() + 6); return [s, e]; }
+    if (ovPeriod === 'month') return [new Date(t.getFullYear(), t.getMonth(), 1), new Date(t.getFullYear(), t.getMonth() + 1, 0)];
+    if (ovPeriod === 'custom' && ovFrom && ovTo) return [parseTanggal(ovFrom), parseTanggal(ovTo)];
+    return null;
+}
+function getOverviewData() {
+    const r = ovRange();
+    return dataTransaksi.filter(i => { if (!i.Tanggal) return false; if (!r) return true; const d = parseTanggal(i.Tanggal); return d >= r[0] && d <= r[1]; });
+}
+function renderPeriodMenu() {
+    document.getElementById('periodMenu').innerHTML = PERIODS.map(p => `<div class="pm-i" onclick="setPeriod('${p[0]}')"><span class="ck">${ovPeriod === p[0] ? '\u2713' : ''}</span>${p[1]}</div>`).join('') +
+        `<div class="pm-c" id="pmCustom" style="display:${ovPeriod === 'custom' ? 'flex' : 'none'}"><input type="date" id="pmFrom" value="${ovFrom}"><input type="date" id="pmTo" value="${ovTo}"><button onclick="applyCustom()">Terapkan</button></div>`;
+    document.getElementById('periodLbl').textContent = (PERIODS.find(p => p[0] === ovPeriod) || PERIODS[2])[1];
+}
+function togglePeriodMenu(e) { e.stopPropagation(); renderPeriodMenu(); document.getElementById('periodMenu').classList.toggle('open'); }
+function setPeriod(p) { ovPeriod = p; renderPeriodMenu(); if (p !== 'custom') { document.getElementById('periodMenu').classList.remove('open'); renderDashboard(); } }
+function applyCustom() { ovFrom = document.getElementById('pmFrom').value; ovTo = document.getElementById('pmTo').value; if (!ovFrom || !ovTo) { showToast('Isi tanggal awal dan akhir.', true); return; } document.getElementById('periodMenu').classList.remove('open'); renderPeriodMenu(); renderDashboard(); }
+document.addEventListener('click', e => { const m = document.getElementById('periodMenu'); if (m && !m.contains(e.target)) m.classList.remove('open'); });
+
+function renderOverview() {
+    const sum = (a, k) => a.filter(i => i.Jenis === k).reduce((s, i) => s + Number(i.Nominal), 0);
+    const bal = sum(dataTransaksi, 'Income') - sum(dataTransaksi, 'Expenses') - sum(dataTransaksi, 'Savings');
+    const per = getOverviewData(), spent = sum(per, 'Expenses');
+    const n = new Date(), m = n.getMonth() + 1, y = n.getFullYear();
+    const bud = dataBudget.filter(b => b.Jenis === 'Expenses' && Number(b.Bulan) === m && Number(b.Tahun) === y);
+    const tb = bud.reduce((s, b) => s + Number(b.Budget), 0);
+    const dim = new Date(y, m, 0).getDate(), left = dim - n.getDate();
+    const pct = tb > 0 ? Math.min(100, spent / tb * 100) : 0;
+    document.getElementById('ovBal').innerHTML = `<div class="bal"><div class="t">Total Balance</div>
+        <div class="v">${idr(bal)} ${tb > 0 ? `<small>of ${idr(tb)} budget</small>` : ''}</div><div class="dsh"></div>
+        <div class="two"><div><p>Spent <b>${idr(spent)}</b></p><div class="bar"><i style="width:${pct}%;background:${pct >= 100 ? '#e5484d' : '#4a8af4'}"></i></div></div>
+        <div><p>End month <b>${left} days</b></p><div class="bar"><i style="width:${Math.max(4, left / dim * 100)}%;background:#e5484d"></i></div></div></div></div>`;
+    const g = {}; per.filter(i => i.Jenis === 'Expenses').forEach(i => g[i.Kategori] = (g[i.Kategori] || 0) + Number(i.Nominal));
+    const top = Object.entries(g).sort((a, b) => b[1] - a[1]).slice(0, 2);
+    document.getElementById('ovTop').innerHTML = top.length ? '<div class="tcg">' + top.map(([k, v]) => {
+        const b = bud.find(x => x.Kategori === k), bv = b ? Number(b.Budget) : 0;
+        return `<div class="tc"><div class="n"><span>${emojiFor(k, 'Expenses')}</span><div><em>${esc(k)}</em><b>${idr(v)}</b></div></div><div class="bar"><i style="width:${bv ? Math.min(100, v / bv * 100) : 0}%;background:#4a8af4"></i></div><small>${bv ? 'of ' + idr(bv) + ' budget' : 'No budget set'}</small></div>`;
+    }).join('') + '</div>' : '<div class="tc emp">No expenses this period</div>';
+    const rec = per.slice().sort((a, b) => parseTanggal(b.Tanggal) - parseTanggal(a.Tanggal) || String(b.Timestamp).localeCompare(String(a.Timestamp))).slice(0, 5);
+    document.getElementById('ovRec').innerHTML = rec.length ? '<div class="rt">' + rec.map(i => {
+        const inc = i.Jenis === 'Income', dt = parseTanggal(i.Tanggal).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return `<div class="rr"><div class="e">${emojiFor(i.Kategori, i.Jenis)}</div><div class="m"><b>${esc(i.Deskripsi || i.Kategori)}</b><em>${esc(i.Kategori)}</em></div><div class="a"><b style="color:${inc ? '#4a8af4' : '#fff'}">${inc ? '+' : '-'}${idr(i.Nominal)}</b><em>${dt}</em></div></div>`;
+    }).join('') + '</div>' : '<div class="rt emp">Belum ada transaksi di periode ini</div>';
+}
+
+function openTxBase() {
+    const d = new Date(), p = v => String(v).padStart(2, '0');
+    document.getElementById('txDate').value = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    document.getElementById('txAmt').value = ''; document.getElementById('txNote').value = '';
+    document.getElementById('emojiPick').innerHTML = EMOJIS.map(e => `<span onclick="pickEmoji('${e}')">${e}</span>`).join('');
+    document.getElementById('emojiPick').classList.remove('open');
+    setTxJenis('Expenses');
+    document.getElementById('txSheet').classList.add('open');
+}
+function closeTx() { document.getElementById('txSheet').classList.remove('open'); }
+function pickEmoji(e) { document.getElementById('txEmoji').textContent = e; document.getElementById('emojiPick').classList.remove('open'); }
+function setTxJenis(jn) {
+    txJenis = jn;
+    document.querySelectorAll('#txSeg button').forEach(b => b.classList.toggle('on', b.dataset.j === jn));
+    document.getElementById('txEmoji').textContent = EMO[jn];
+    fillTxCat();
+}
+function fillTxCat() {
+    const dv = document.getElementById('txDate').value; if (!dv) return;
+    const d = parseTanggal(dv), list = (kategoriForPeriod(d.getMonth() + 1, d.getFullYear())[txJenis]) || [];
+    document.getElementById('txCat').innerHTML = list.length ? '<option value="">Choose</option>' + list.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('') : '<option value="">Belum ada kategori</option>';
+}
+document.getElementById('txAmt').addEventListener('input', function () { const r = this.value.replace(/\D/g, ''); this.value = r ? Number(r).toLocaleString('id-ID') : ''; });
+async function submitTx() {
+    const nominal = document.getElementById('txAmt').value.replace(/\D/g, ''), kat = document.getElementById('txCat').value, tgl = document.getElementById('txDate').value;
+    if (!nominal || !kat || !tgl) { showToast('Lengkapi nominal, kategori, dan tanggal.', true); return; }
+    const btn = document.getElementById('txGo'); btn.disabled = true; showSaving('Menyimpan transaksi...');
+    try {
+        const res = await apiPost({ action: txEditId ? 'update' : 'insert', ID: txEditId || '', Tanggal: tgl, Jenis: txJenis, Kategori: kat, Nominal: nominal, Deskripsi: document.getElementById('txNote').value });
+        if (res.status === 'success') {
+            const em = emojiMap(); em[kat] = document.getElementById('txEmoji').textContent;
+            try { localStorage.setItem('mb_emoji', JSON.stringify(em)); } catch (e) {}
+            closeTx(); await loadData(); showToast('\u2713 Transaksi disimpan!');
+        } else showToast('Gagal: ' + res.message, true);
+    } catch (err) { showToast('Error: ' + err.message, true); }
+    finally { hideSaving(); btn.disabled = false; }
+}
+
+
+// ==============================================
+// TAHAP 2: HISTORY, BUDGETS, FORM BUDGET
+// ==============================================
+let hSearch = '', hJenis = 'all', hSearchOn = false;
+let bMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0'), bJenisTab = 'Expenses', budJenis = 'Expenses', budEdit = '';
+const _ld = loadData;
+loadData = async function () { await _ld.apply(this, arguments); refreshViews(); };
+function refreshViews() { try { renderHistory(); renderBudgets(); } catch (e) { console.error(e); } }
+function fabAction() { const p = document.querySelector('.page.active'); if (p && p.id === 'page-budget') openBud(); else openTx(); }
+function ymd(t) { const d = parseTanggal(t), p = v => String(v).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+function rowHtml(i) {
+    const inc = i.Jenis === 'Income', dt = parseTanggal(i.Tanggal).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `<div class="rr" onclick="openTx('${i.ID}')"><div class="e">${emojiFor(i.Kategori, i.Jenis)}</div><div class="m"><b>${esc(i.Deskripsi || i.Kategori)}</b><em>${esc(i.Kategori)}</em></div><div class="a"><b style="color:${inc ? '#4a8af4' : '#fff'}">${inc ? '+' : '-'}${idr(i.Nominal)}</b><em>${dt}</em></div></div>`;
+}
+function renderHistory() {
+    const el = document.getElementById('hist'); if (!el) return;
+    const q = hSearch.trim().toLowerCase();
+    const d = dataTransaksi.filter(i => i.Tanggal && (hJenis === 'all' || i.Jenis === hJenis) && (!q || (i.Kategori + ' ' + i.Deskripsi).toLowerCase().includes(q)))
+        .sort((a, b) => parseTanggal(b.Tanggal) - parseTanggal(a.Tanggal) || String(b.Timestamp).localeCompare(String(a.Timestamp)));
+    const s = k => d.filter(i => i.Jenis === k).reduce((t, i) => t + Number(i.Nominal), 0);
+    const groups = {}; d.forEach(i => { const k = parseTanggal(i.Tanggal).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); (groups[k] = groups[k] || []).push(i); });
+    const fo = [['all', 'All'], ['Expenses', 'Expenses'], ['Income', 'Income'], ['Savings', 'Savings']];
+    el.innerHTML = `<div class="hh"><h2>History</h2><div class="hp"><button onclick="hSearchOn=!hSearchOn;renderHistory()"><i class="fa-solid fa-magnifying-glass"></i></button><button onclick="event.stopPropagation();document.getElementById('fMenu').classList.toggle('open')"><i class="fa-solid fa-bars-staggered"></i></button></div>
+        <div class="fm" id="fMenu">${fo.map(f => `<div class="pm-i" onclick="hJenis='${f[0]}';renderHistory()"><span class="ck">${hJenis === f[0] ? '\u2713' : ''}</span>${f[1]}</div>`).join('')}</div></div>
+        ${hSearchOn ? `<input class="srch" id="hQ" placeholder="Search" value="${esc(hSearch)}" oninput="hSearch=this.value;renderHistory();var e=document.getElementById('hQ');e.focus();e.setSelectionRange(9999,9999)">` : ''}
+        <div class="g2" style="margin-top:8px"><div class="stat-card b"><div class="stat-label"><i class="fa-solid fa-plus"></i><span>Income</span></div><div class="stat-value">${idr(s('Income'))}</div></div>
+        <div class="stat-card"><div class="stat-label"><i class="fa-solid fa-minus"></i><span>Expenses</span></div><div class="stat-value">${idr(s('Expenses'))}</div></div>
+        <div class="stat-card g" style="grid-column:1 / -1"><div class="stat-label"><i class="fa-solid fa-piggy-bank"></i><span>Savings</span></div><div class="stat-value">${idr(s('Savings'))}</div></div></div>
+        ${Object.keys(groups).length ? Object.entries(groups).map(([k, v]) => `<div class="mh">${k}</div><div class="rt">${v.map(rowHtml).join('')}</div>`).join('') : '<div class="emp">Belum ada transaksi</div>'}`;
+}
+document.addEventListener('click', () => { const f = document.getElementById('fMenu'); if (f) f.classList.remove('open'); });
+
+function renderBudgets() {
+    const el = document.getElementById('bud'); if (!el) return;
+    const [y, m] = bMonth.split('-').map(Number);
+    const items = dataBudget.filter(b => b.Jenis === bJenisTab && Number(b.Bulan) === m && Number(b.Tahun) === y && Number(b.Budget) > 0);
+    const act = getActualByCategory(bJenisTab, m, y) || {};
+    const planned = items.reduce((t, b) => t + Number(b.Budget), 0), used = items.reduce((t, b) => t + Number(act[b.Kategori] || 0), 0);
+    const lbl = new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    el.innerHTML = `<div class="hh"><h2>Budgets</h2><label class="mp">${lbl}<input type="month" value="${bMonth}" onchange="bMonth=this.value||bMonth;renderBudgets()"></label></div>
+        <div class="tabs"><button class="${bJenisTab === 'Expenses' ? 'on' : ''}" onclick="bJenisTab='Expenses';renderBudgets()">Expenses</button><button class="${bJenisTab === 'Savings' ? 'on' : ''}" onclick="bJenisTab='Savings';renderBudgets()">Savings</button></div>
+        <div class="g2"><div class="stat-card b"><div class="stat-label"><i class="fa-solid fa-equals"></i><span>Planned</span></div><div class="stat-value">${idr(planned)}</div></div>
+        <div class="stat-card g"><div class="stat-label"><i class="fa-solid fa-check"></i><span>Remaining</span></div><div class="stat-value">${idr(planned - used)}</div></div></div>
+        <div class="g2" style="margin-top:10px">${items.map(b => { const a = Number(act[b.Kategori] || 0), bv = Number(b.Budget), p = Math.min(100, a / bv * 100);
+            return `<div class="tc bc" onclick="openBud('${esc(b.Kategori).replace(/'/g, "\\'")}')"><div class="n"><span>${emojiFor(b.Kategori, b.Jenis)}</span><div><em>${esc(b.Kategori)}</em><b>${idr(a)}</b></div></div><div class="bar"><i style="width:${p}%;background:${a > bv ? '#e5484d' : '#4a8af4'}"></i></div><small>of ${idr(bv)} budget</small></div>`; }).join('')}</div>
+        ${items.length ? '' : '<div class="emp">Belum ada budget bulan ini.<br>Tekan + untuk membuat.</div>'}`;
+}
+
+function openTx(id) {
+    openTxBase(); txEditId = id || '';
+    document.getElementById('txTitle').textContent = id ? 'Edit Transaction' : 'New Transaction';
+    document.getElementById('txDel').style.display = id ? 'block' : 'none';
+    if (!id) return;
+    const t = dataTransaksi.find(x => String(x.ID) === String(id)); if (!t) return;
+    document.getElementById('txDate').value = ymd(t.Tanggal);
+    setTxJenis(t.Jenis);
+    const c = document.getElementById('txCat');
+    if (![...c.options].some(o => o.value === t.Kategori)) c.insertAdjacentHTML('beforeend', `<option value="${esc(t.Kategori)}">${esc(t.Kategori)}</option>`);
+    c.value = t.Kategori;
+    document.getElementById('txAmt').value = Number(t.Nominal).toLocaleString('id-ID');
+    document.getElementById('txNote').value = t.Deskripsi || '';
+    document.getElementById('txEmoji').textContent = emojiFor(t.Kategori, t.Jenis);
+}
+function delTx() { const id = txEditId; closeTx(); hapusTransaksi(id); }
+
+function setBudJenis(jn) {
+    budJenis = jn;
+    document.querySelectorAll('#bSeg button').forEach(b => b.classList.toggle('on', b.dataset.j === jn));
+    const [y, m] = bMonth.split('-').map(Number), list = (kategoriForPeriod(m, y)[jn]) || [];
+    document.getElementById('bCat').innerHTML = list.length ? '<option value="">Choose</option>' + list.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('') : '<option value="">Belum ada kategori</option>';
+    document.getElementById('bEmoji').textContent = EMO[jn];
+}
+function openBud(kat) {
+    budEdit = kat || '';
+    document.getElementById('bTitle').textContent = kat ? 'Edit Budget' : 'New Budget';
+    document.getElementById('bDel').style.display = kat ? 'block' : 'none';
+    document.getElementById('bInterval').style.display = kat ? 'none' : 'block';
+    document.getElementById('bAmt').value = ''; document.getElementById('bEndOn').checked = false; document.getElementById('bEndRow').style.display = 'none'; document.getElementById('bRep').value = 'm';
+    setBudJenis(bJenisTab);
+    if (kat) {
+        const [y, m] = bMonth.split('-').map(Number), b = dataBudget.find(x => x.Jenis === bJenisTab && x.Kategori === kat && Number(x.Bulan) === m && Number(x.Tahun) === y);
+        const c = document.getElementById('bCat');
+        if (![...c.options].some(o => o.value === kat)) c.insertAdjacentHTML('beforeend', `<option value="${esc(kat)}">${esc(kat)}</option>`);
+        c.value = kat; document.getElementById('bEmoji').textContent = emojiFor(kat, bJenisTab);
+        document.getElementById('bAmt').value = b ? Number(b.Budget).toLocaleString('id-ID') : '';
+    }
+    document.getElementById('bSheet').classList.add('open');
+}
+function closeBud() { document.getElementById('bSheet').classList.remove('open'); }
+document.getElementById('bAmt').addEventListener('input', function () { const r = this.value.replace(/\D/g, ''); this.value = r ? Number(r).toLocaleString('id-ID') : ''; });
+async function saveBudgets(list, msg) {
+    showSaving('Menyimpan budget...');
+    try {
+        const res = await apiPost({ action: 'updateBudget', budgets: list });
+        if (res.status === 'success') { dataBudget = list; closeBud(); renderBudgets(); renderOverview(); showToast(msg); }
+        else showToast('Gagal: ' + res.message, true);
+    } catch (err) { showToast('Error: ' + err.message, true); }
+    finally { hideSaving(); }
+}
+function submitBud() {
+    const amt = parseInt(document.getElementById('bAmt').value.replace(/\D/g, '')) || 0, kat = document.getElementById('bCat').value;
+    if (!amt || !kat) { showToast('Lengkapi nominal dan kategori.', true); return; }
+    const [y, m] = bMonth.split('-').map(Number); let ey = y, em = m;
+    if (!budEdit && document.getElementById('bRep').value === 'm') {
+        const ed = document.getElementById('bEnd').value;
+        if (document.getElementById('bEndOn').checked && ed) { const d = parseTanggal(ed); ey = d.getFullYear(); em = d.getMonth() + 1; if (ey * 12 + em < y * 12 + m) { showToast('End Date sebelum bulan awal.', true); return; } }
+        else { ey = y; em = 12; }
+    }
+    const keys = new Set(), add = [];
+    for (let yy = y, mm = m; yy * 12 + mm <= ey * 12 + em && add.length < 60; mm++) { if (mm > 12) { mm = 1; yy++; } keys.add(yy + '-' + mm); add.push({ Jenis: budJenis, Kategori: kat, Bulan: mm, Tahun: yy, Budget: amt }); }
+    const kept = dataBudget.filter(b => !(b.Jenis === budJenis && b.Kategori === kat && keys.has(Number(b.Tahun) + '-' + Number(b.Bulan))));
+    saveBudgets([...kept, ...add], add.length > 1 ? '\u2713 Budget tersimpan untuk ' + add.length + ' bulan!' : '\u2713 Budget tersimpan!');
+}
+function delBud() {
+    if (!confirm('Hapus budget ini untuk bulan ini?')) return;
+    const [y, m] = bMonth.split('-').map(Number);
+    saveBudgets(dataBudget.filter(b => !(b.Jenis === budJenis && b.Kategori === budEdit && Number(b.Bulan) === m && Number(b.Tahun) === y)), '\u2713 Budget dihapus!');
+}
+
+
+// ==============================================
+// TAHAP 3: SETTINGS & CATEGORIES
+// ==============================================
+let sView = 'main', cTab = 'Expenses', cSort = false, cDraft = [], cIdx = -1;
+let cMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+const CT = [['Expenses', 'Expenses'], ['Income', 'Incomes'], ['Savings', 'Savings']];
+function curCats() {
+    const [y, m] = cMonth.split('-').map(Number), s = kategoriForPeriod(m, y) || {};
+    return { Income: (s.Income || []).slice(), Expenses: (s.Expenses || []).slice(), Savings: (s.Savings || []).slice() };
+}
+function renderSettings() {
+    const el = document.getElementById('set'); if (!el) return;
+    if (sView === 'cats') return renderCats(el);
+    const em = (currentUser && currentUser.email) || '', ini = (em.slice(0, 2) || 'MB').toUpperCase();
+    const row = (bg, ic, t, v, on, red) => `<div class="sh-row" onclick="${on}"><span class="ic" style="background:${bg}"><i class="fa-solid ${ic}"></i></span><b style="${red ? 'color:#ff5a5f' : ''}">${t}</b>${v ? `<span class="sv">${v}</span>` : ''}${on && !red ? '<i class="fa-solid fa-chevron-right" style="color:#636366;font-size:13px"></i>' : ''}</div>`;
+    el.innerHTML = `<h2 style="margin-top:16px">Settings</h2>
+        <div class="sh-c"><div class="sh-row" style="cursor:default"><div class="av">${esc(ini)}</div><b style="font-size:15px;word-break:break-all">${esc(em || 'MyBudget')}<br><span class="sv" style="font-size:13px;font-weight:600">Personal account</span></b></div></div>
+        <div class="sh-c" style="margin-top:14px">${row('#5b8def', 'fa-building-columns', 'Account Balance', 'Soon', '')}${row('#7b6fe8', 'fa-dollar-sign', 'Currency', 'IDR', '')}${row('#3fb99a', 'fa-tag', 'Categories', '', "sView='cats';renderSettings()")}</div>
+        <div class="sh-c" style="margin-top:14px">${row('#4a8af4', 'fa-arrows-rotate', 'Refresh Data', '', 'refreshData()')}${row('#e5484d', 'fa-right-from-bracket', 'Logout', '', 'doLogout()', true)}</div>`;
+}
+function renderCats(el) {
+    const list = cSort ? cDraft : curCats()[cTab], [y, m] = cMonth.split('-').map(Number);
+    const lbl = new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const rb = 'style="background:var(--card)"';
+    el.innerHTML = `<div class="hh" style="margin-top:6px"><button class="sh-r" ${rb} onclick="sView='main';cSort=false;renderSettings()"><i class="fa-solid fa-chevron-left"></i></button>
+        ${cSort ? '<button class="mp" style="border:none" onclick="doneSort()">Done</button>' : `<button class="sh-r" ${rb} onclick="event.stopPropagation();document.getElementById('cMenu').classList.toggle('open')"><i class="fa-solid fa-ellipsis"></i></button>`}
+        <div class="fm" id="cMenu"><div class="pm-i" onclick="openCat()"><span class="ck"><i class="fa-solid fa-plus"></i></span>New Category</div><div class="pm-i" onclick="startSort()"><span class="ck"><i class="fa-solid fa-arrow-up-arrow-down"></i></span>Sort Categories</div></div></div>
+        <h2>Categories</h2>
+        <label class="mp" style="display:inline-block">${lbl}<input type="month" value="${cMonth}" onchange="cMonth=this.value||cMonth;renderSettings()"></label>
+        <div class="tabs">${CT.map(t => `<button class="${cTab === t[0] ? 'on' : ''}" onclick="cTab='${t[0]}';cSort=false;renderSettings()">${t[1]}</button>`).join('')}</div>
+        ${list.length ? `<div class="rt">${list.map((k, i) => `<div class="rr" onclick="${cSort ? '' : 'openCat(' + i + ')'}"><div class="e">${emojiFor(k, cTab)}</div><div class="m"><b>${esc(k)}</b></div>${cSort ? `<button class="sb" onclick="moveCat(${i},-1)"><i class="fa-solid fa-chevron-up"></i></button><button class="sb" onclick="moveCat(${i},1)"><i class="fa-solid fa-chevron-down"></i></button>` : '<i class="fa-solid fa-chevron-right" style="color:#636366"></i>'}</div>`).join('')}</div>` : '<div class="emp">Belum ada kategori.<br>Buka menu \u22EF lalu pilih New Category.</div>'}
+        <p class="hint">Kategori berlaku per bulan. Bulan yang belum diatur otomatis memakai bulan sebelumnya.</p>`;
+}
+document.addEventListener('click', () => { const c = document.getElementById('cMenu'); if (c) c.classList.remove('open'); });
+function startSort() { cDraft = curCats()[cTab]; cSort = true; renderSettings(); }
+function moveCat(i, d) { const t = i + d; if (t < 0 || t >= cDraft.length) return; [cDraft[i], cDraft[t]] = [cDraft[t], cDraft[i]]; renderSettings(); }
+function doneSort() { const arr = cDraft.slice(); cSort = false; saveCats(cTab, arr, '\u2713 Urutan disimpan!'); }
+async function saveCats(jn, arr, msg) {
+    const [y, m] = cMonth.split('-').map(Number), v = curCats(); v[jn] = arr;
+    showSaving('Menyimpan kategori...');
+    try {
+        const res = await apiPost({ action: 'updateSetup', Bulan: m, Tahun: y, Income: v.Income, Expenses: v.Expenses, Savings: v.Savings });
+        if (res.status === 'success') {
+            kategoriByPeriod[periodKey(m, y)] = { Income: v.Income.slice(), Expenses: v.Expenses.slice(), Savings: v.Savings.slice() };
+            daftarKategori = aggregateKategori(kategoriByPeriod);
+            closeCat(); renderSettings(); refreshViews(); renderOverview(); showToast(msg);
+        } else showToast('Gagal: ' + res.message, true);
+    } catch (err) { showToast('Error: ' + err.message, true); }
+    finally { hideSaving(); }
+}
+function openCat(i) {
+    cIdx = (i === undefined) ? -1 : i;
+    const name = cIdx >= 0 ? curCats()[cTab][cIdx] : '', inp = document.getElementById('cName');
+    document.getElementById('cTitle').textContent = cIdx >= 0 ? 'Edit Category' : 'New Category';
+    inp.value = name || ''; inp.readOnly = cIdx >= 0;
+    document.getElementById('cHint').textContent = cIdx >= 0 ? 'Nama tidak bisa diubah agar transaksi dan budget lama tetap terhubung. Anda bisa mengganti ikon atau menghapusnya.' : '';
+    document.getElementById('cDel').style.display = cIdx >= 0 ? 'block' : 'none';
+    document.getElementById('cEmoji').textContent = cIdx >= 0 ? emojiFor(name, cTab) : EMO[cTab];
+    document.getElementById('cPick').innerHTML = EMOJIS.map(e => `<span onclick="document.getElementById('cEmoji').textContent='${e}';document.getElementById('cPick').classList.remove('open')">${e}</span>`).join('');
+    document.getElementById('cPick').classList.remove('open');
+    document.getElementById('cSheet').classList.add('open');
+}
+function closeCat() { document.getElementById('cSheet').classList.remove('open'); }
+function submitCat() {
+    const name = document.getElementById('cName').value.trim(), list = curCats()[cTab];
+    if (!name) { showToast('Isi nama kategori.', true); return; }
+    const em = emojiMap(); em[name] = document.getElementById('cEmoji').textContent;
+    if (cIdx >= 0) {
+        try { localStorage.setItem('mb_emoji', JSON.stringify(em)); } catch (e) {}
+        closeCat(); renderSettings(); refreshViews(); renderOverview(); return;
+    }
+    if (list.some(k => k.toLowerCase() === name.toLowerCase())) { showToast('Kategori sudah ada.', true); return; }
+    try { localStorage.setItem('mb_emoji', JSON.stringify(em)); } catch (e) {}
+    list.push(name); saveCats(cTab, list, '\u2713 Kategori ditambahkan!');
+}
+function delCat() {
+    const list = curCats()[cTab], name = list[cIdx];
+    if (!confirm('Hapus kategori "' + name + '" dari bulan ini? Transaksi lama tetap tersimpan.')) return;
+    list.splice(cIdx, 1); saveCats(cTab, list, '\u2713 Kategori dihapus!');
+}
