@@ -435,179 +435,21 @@ function getBudgetForFilter(jenis, kategori) {
 // ==============================================
 // DASHBOARD
 // ==============================================
+function syncLegacyFilter() {
+    const r = ovRange(), now = new Date();
+    let y = now.getFullYear(), m = 0;
+    if (r) {
+        y = r[0].getFullYear();
+        const same = r[0].getMonth() === r[1].getMonth() && r[0].getFullYear() === r[1].getFullYear();
+        m = (ovPeriod === 'custom' && !same) ? 0 : r[0].getMonth() + 1;
+    }
+    const ye = document.getElementById('filterTahun'), be = document.getElementById('filterBulan');
+    if (![...ye.options].some(o => o.value === String(y))) ye.insertAdjacentHTML('beforeend', `<option value="${y}">${y}</option>`);
+    ye.value = String(y); be.value = String(m);
+}
 function renderDashboard() {
-    const filtered = getOverviewData();
-    let totIncome = 0, totExp = 0, totSav = 0;
-    filtered.forEach(i => {
-        const n = Number(i.Nominal);
-        if (i.Jenis === 'Income') totIncome += n;
-        else if (i.Jenis === 'Expenses') totExp += n;
-        else if (i.Jenis === 'Savings') totSav += n;
-    });
-    document.getElementById('dash-income').textContent = formatRp(totIncome);
-    document.getElementById('dash-expenses').textContent = formatRp(totExp);
-    document.getElementById('dash-savings').textContent = formatRp(totSav);
-    const rate = totIncome > 0 ? Math.round(totSav / totIncome * 100) : 0;
-    document.getElementById('dash-rate').textContent = rate + '%';
-    renderBreakdown('Income', filtered);
-    renderBreakdown('Expenses', filtered);
-    renderBreakdown('Savings', filtered);
-    renderDashboardCharts(filtered);
+    syncLegacyFilter();
     renderOverview();
-}
-
-function renderBreakdown(jenis, filtered) {
-    const c = JENIS_COLOR[jenis];
-    const categories = kategoriForFilter(jenis);
-    const actuals = {};
-    filtered.filter(i => i.Jenis === jenis).forEach(i => {
-        actuals[i.Kategori] = (actuals[i.Kategori] || 0) + Number(i.Nominal);
-    });
-    const allCats = [...new Set([...categories, ...Object.keys(actuals)])];
-    const rows = allCats.map(kat => {
-        const tracked = actuals[kat] || 0;
-        const budget = getBudgetForFilter(jenis, kat);
-        const pct = budget > 0 ? Math.round(tracked / budget * 100) : 0;
-        const sisa = Math.max(budget - tracked, 0);
-        const excess = budget > 0 && tracked > budget ? tracked - budget : 0;
-        return { kat, tracked, budget, pct, sisa, excess };
-    });
-    const totTracked = rows.reduce((s, r) => s + r.tracked, 0);
-    const totBudget = rows.reduce((s, r) => s + r.budget, 0);
-    const totExcess = rows.reduce((s, r) => s + r.excess, 0);
-    const totSisa = Math.max(totBudget - totTracked, 0);
-    const totPct = totBudget > 0 ? Math.round(totTracked / totBudget * 100) : 0;
-    const showExcess = jenis !== 'Savings';
-    const rowsHTML = rows.map(r => `
-        <tr style="border-bottom:1px solid #f1f5f9; font-size:12px">
-            <td style="padding:8px 10px; font-weight:500; color:#374151">${r.kat}</td>
-            <td style="padding:8px 10px; text-align:right; color:#0f172a; font-weight:600">${formatRp(r.tracked)}</td>
-            <td style="padding:8px 10px; text-align:right; color:#64748b">${r.budget > 0 ? formatRp(r.budget) : '<span style="color:#cbd5e1">-</span>'}</td>
-            <td style="padding:8px 10px; text-align:right; font-weight:600; color:${r.pct > 100 ? '#dc2626' : '#374151'}">${r.budget > 0 ? r.pct + '%' : '<span style="color:#cbd5e1">-</span>'}</td>
-            <td style="padding:8px 10px; min-width:70px">
-                ${r.budget > 0 ? `<div class="pbar"><div class="pbar-fill" style="width:${Math.min(r.pct,100)}%; background:${r.pct > 100 ? '#dc2626' : c.border}"></div></div>` : ''}
-            </td>
-            <td style="padding:8px 10px; text-align:right; color:${r.sisa === 0 && r.budget > 0 ? '#dc2626' : '#16a34a'}">${r.budget > 0 ? formatRp(r.sisa) : '<span style="color:#cbd5e1">-</span>'}</td>
-            ${showExcess ? `<td style="padding:8px 10px; text-align:right; color:#dc2626; font-weight:600">${r.excess > 0 ? formatRp(r.excess) : '<span style="color:#cbd5e1">-</span>'}</td>` : ''}
-        </tr>
-    `).join('');
-    document.getElementById('breakdown-' + jenis.toLowerCase()).innerHTML = `
-        <div style="background:white; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0">
-            <div style="background:${c.bg}; color:white; padding:10px 14px; display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600">
-                <i class="fa-solid ${JENIS_ICON[jenis]}"></i> ${jenis}
-            </div>
-            <div style="overflow-x:auto">
-                <table style="width:100%">
-                    <thead>
-                        <tr style="background:#f8fafc; color:#64748b; font-size:10px; text-transform:uppercase; letter-spacing:0.05em">
-                            <th style="padding:8px 10px; text-align:left; border-bottom:1px solid #e2e8f0">${jenis}</th>
-                            <th style="padding:8px 10px; text-align:right; border-bottom:1px solid #e2e8f0">Aktual</th>
-                            <th style="padding:8px 10px; text-align:right; border-bottom:1px solid #e2e8f0">Budget</th>
-                            <th style="padding:8px 10px; text-align:right; border-bottom:1px solid #e2e8f0">%</th>
-                            <th style="padding:8px 10px; border-bottom:1px solid #e2e8f0; min-width:70px">Progress</th>
-                            <th style="padding:8px 10px; text-align:right; border-bottom:1px solid #e2e8f0">Sisa</th>
-                            ${showExcess ? '<th style="padding:8px 10px; text-align:right; border-bottom:1px solid #e2e8f0; color:#dc2626">Excess</th>' : ''}
-                        </tr>
-                    </thead>
-                    <tbody>${rowsHTML}</tbody>
-                    <tfoot>
-                        <tr style="background:#f8fafc; font-size:12px; font-weight:700; border-top:2px solid #e2e8f0">
-                            <td style="padding:9px 10px; color:#0f172a">Total</td>
-                            <td style="padding:9px 10px; text-align:right">${formatRp(totTracked)}</td>
-                            <td style="padding:9px 10px; text-align:right; color:#64748b">${totBudget > 0 ? formatRp(totBudget) : '-'}</td>
-                            <td style="padding:9px 10px; text-align:right; color:${totPct > 100 ? '#dc2626' : '#374151'}">${totBudget > 0 ? totPct + '%' : '-'}</td>
-                            <td style="padding:9px 10px">
-                                ${totBudget > 0 ? `<div class="pbar"><div class="pbar-fill" style="width:${Math.min(totPct,100)}%; background:${c.border}"></div></div>` : ''}
-                            </td>
-                            <td style="padding:9px 10px; text-align:right; color:#16a34a">${totBudget > 0 ? formatRp(totSisa) : '-'}</td>
-                            ${showExcess ? `<td style="padding:9px 10px; text-align:right; color:#dc2626">${totExcess > 0 ? formatRp(totExcess) : '-'}</td>` : ''}
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-    `;
-}
-
-function renderDashboardCharts(filtered) {
-    const buildMap = (jenis) => {
-        const map = {};
-        filtered.filter(i => i.Jenis === jenis).forEach(i => {
-            map[i.Kategori] = (map[i.Kategori] || 0) + Number(i.Nominal);
-        });
-        return map;
-    };
-    makeDoughnut('chartIncome', buildMap('Income'), INCOME_COLORS);
-    makeDoughnut('chartExpenses', buildMap('Expenses'), EXP_COLORS);
-    makeDoughnut('chartSavings', buildMap('Savings'), SAV_COLORS);
-    makeMonthlyBar(filtered);
-}
-
-function makeDoughnut(id, map, colors) {
-    if (chartInstances[id]) chartInstances[id].destroy();
-    const ctx = document.getElementById(id);
-    if (!ctx) return;
-    const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    let labels = sorted.map(([k]) => k);
-    let data = sorted.map(([, v]) => v);
-    const entries = Object.entries(map);
-    if (entries.length > 5) {
-        const othersSum = entries.slice(5).reduce((sum, [, v]) => sum + v, 0);
-        labels.push('Lainnya');
-        data.push(othersSum);
-    }
-    if (!labels.length) { labels = ['Tidak ada data']; data = [1]; }
-    chartInstances[id] = new Chart(ctx, {
-        type: 'doughnut',
-        data: { labels, datasets: [{ data, backgroundColor: data.length <= 5 ? colors.slice(0, data.length) : [...colors.slice(0, 5), '#cbd5e1'], borderWidth: 0 }] },
-        options: {
-            responsive: true, maintainAspectRatio: true, cutout: '60%',
-            plugins: {
-                legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 8, padding: 6, usePointStyle: true } },
-                tooltip: { callbacks: { label: ctx => ' ' + formatRp(ctx.raw) }, padding: 8, titleFont: { size: 11 }, bodyFont: { size: 10 } }
-            }
-        }
-    });
-}
-
-function makeMonthlyBar(filtered) {
-    if (chartInstances['chartMonthly']) chartInstances['chartMonthly'].destroy();
-    const ctx = document.getElementById('chartMonthly');
-    if (!ctx) return;
-    const tahun = parseInt(document.getElementById('filterTahun').value);
-    const bulan = parseInt(document.getElementById('filterBulan').value);
-    if (bulan !== 0) {
-        const totals = { Income: 0, Expenses: 0, Savings: 0 };
-        filtered.forEach(i => { if (totals[i.Jenis] !== undefined) totals[i.Jenis] += Number(i.Nominal); });
-        chartInstances['chartMonthly'] = new Chart(ctx, {
-            type: 'bar',
-            data: { labels: ['Income', 'Expenses', 'Savings'], datasets: [{ data: [totals.Income, totals.Expenses, totals.Savings], backgroundColor: ['#22c55e', '#ef4444', '#3b82f6'], borderRadius: 6, borderSkipped: false }] },
-            options: {
-                responsive: true, maintainAspectRatio: true,
-                plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => formatRp(c.raw) }, padding: 8, titleFont: { size: 11 }, bodyFont: { size: 10 } } },
-                scales: { y: { ticks: { callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', font: { size: 9 } }, grid: { color: '#2c2c2e' }, beginAtZero: true }, x: { ticks: { font: { size: 10 } } } }
-            }
-        });
-    } else {
-        const monthly = { Income: Array(12).fill(0), Expenses: Array(12).fill(0), Savings: Array(12).fill(0) };
-        dataTransaksi.filter(i => parseTanggal(i.Tanggal).getFullYear() === tahun).forEach(i => {
-            const m = parseTanggal(i.Tanggal).getMonth();
-            if (monthly[i.Jenis]) monthly[i.Jenis][m] += Number(i.Nominal);
-        });
-        chartInstances['chartMonthly'] = new Chart(ctx, {
-            type: 'bar',
-            data: { labels: MONTHS_SHORT, datasets: [
-                { label: 'Income', data: monthly.Income, backgroundColor: '#4ade80', borderRadius: 3, borderSkipped: false },
-                { label: 'Expenses', data: monthly.Expenses, backgroundColor: '#f87171', borderRadius: 3, borderSkipped: false },
-                { label: 'Savings', data: monthly.Savings, backgroundColor: '#60a5fa', borderRadius: 3, borderSkipped: false }
-            ] },
-            options: {
-                responsive: true, maintainAspectRatio: true,
-                plugins: { legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 8, padding: 6, usePointStyle: true } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + formatRp(c.raw) }, padding: 8, titleFont: { size: 11 }, bodyFont: { size: 10 } } },
-                scales: { y: { ticks: { callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', font: { size: 9 } }, grid: { color: '#2c2c2e' }, beginAtZero: true, stacked: false }, x: { ticks: { font: { size: 9 } }, stacked: false } }
-            }
-        });
-    }
 }
 
 // ==============================================
@@ -1180,7 +1022,22 @@ warnaiJenis('Income');
 // ==============================================
 let txEditId = '', ovPeriod = 'month', ovFrom = '', ovTo = '', txJenis = 'Expenses';
 const EMO = { Income: '\u{1F4BC}', Expenses: '\u{1F6D2}', Savings: '\u{1F3E6}' };
-const EMOJIS = ['\u{1F6D2}','\u2615','\u{1F37D}\uFE0F','\u{1F6F5}','\u{1F697}','\u{1F687}','\u26FD','\u{1F3E0}','\u{1F4A1}','\u{1F4F1}','\u{1F3AC}','\u{1F381}','\u{1F48A}','\u{1F4DA}','\u2708\uFE0F','\u{1F455}','\u{1F4BC}','\u{1F3E6}','\u{1F4B0}','\u{1F437}'];
+const EMOJI_GROUPS = [
+    ['Makanan & Minuman', ['🍽️','🍚','🍜','🍝','🍕','🍔','🍟','🍗','🍣','🍱','🌮','🥘','🥗','🥚','🍞','🍰','🍦','🍫','🍎','🥦','🥩','🐟','☕','🧋','🥤','🍺','🍷','💧']],
+    ['Belanja', ['🛒','🛍️','👕','👗','👟','👜','👠','👓','⌚','💄','🧴','🧼','🧻','🧹','🛋️','🛏️','🪑','📦','🏪','🏬']],
+    ['Transportasi', ['🛵','🏍️','🚗','🚕','🚙','🚌','🚇','🚂','🚲','⛽','🛣️','🅿️','🔧','🛞','✈️','🚢','🚦']],
+    ['Rumah & Tagihan', ['🏠','🏢','🏘️','🔑','💡','🔥','🚿','🛁','📶','📱','💻','📺','📡','🧾','📄','🔧','🪛','🔩','🧯']],
+    ['Kesehatan', ['💊','🩺','🏥','💉','🦷','🧘','🏋️','🏃','⚽','🏊','🚴','🧴']],
+    ['Pendidikan & Kerja', ['📚','🎓','✏️','📖','🏫','💼','💻','🖥️','📈','📊','📝','🗂️','👔','🛠️','🏢']],
+    ['Hiburan & Hobi', ['🎬','🎮','🎧','🎵','🎤','🎸','🎨','📷','🎲','🎳','🎯','🎣','⛳','🏕️','🏖️','🎡','🎭','📕','🧩','🎤']],
+    ['Keluarga & Sosial', ['👨‍👩‍👧','👶','🧸','🍼','👪','👵','🧓','❤️','🎁','🎂','🎉','💍','💐','🙏','🕌','⛪','🤲','🤝','🐕','🐈']],
+    ['Keuangan & Tabungan', ['💰','💵','💸','💳','🏦','🐷','💱','🪙','💎','📈','📉','🧾','🔐','🛡️','🎯','🏆','🏡','💼','📥','📤','⚖️','🧮']],
+    ['Lainnya', ['⭐','🌟','✨','🏷️','📌','📎','💡','❓','❗','🔄','📅','⏰','🌍','🌱','☁️','🌈','🧳','🎲']]
+];
+const EMOJIS = [...new Set(EMOJI_GROUPS.flatMap(g => g[1]))];
+function emojiPickerHtml(target) {
+    return EMOJI_GROUPS.map(g => `<div class="eg">${g[0]}</div><div class="ec">${[...new Set(g[1])].map(e => `<span class="em" onclick="document.getElementById('${target}').textContent='${e}';document.getElementById('cPick').classList.remove('open')">${e}</span>`).join('')}</div>`).join('');
+}
 const PERIODS = [['today','Today'],['week','This Week'],['month','This Month'],['all','All Time'],['custom','Custom']];
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 function idr(n) { return 'IDR ' + Math.round(n).toLocaleString('id-ID'); }
@@ -1238,13 +1095,11 @@ function openTxBase() {
     const d = new Date(), p = v => String(v).padStart(2, '0');
     document.getElementById('txDate').value = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
     document.getElementById('txAmt').value = ''; document.getElementById('txNote').value = '';
-    document.getElementById('emojiPick').innerHTML = EMOJIS.map(e => `<span onclick="pickEmoji('${e}')">${e}</span>`).join('');
-    document.getElementById('emojiPick').classList.remove('open');
     setTxJenis('Expenses');
     document.getElementById('txSheet').classList.add('open');
 }
 function closeTx() { document.getElementById('txSheet').classList.remove('open'); }
-function pickEmoji(e) { document.getElementById('txEmoji').textContent = e; document.getElementById('emojiPick').classList.remove('open'); }
+function txCatChange() { const v = document.getElementById('txCat').value; document.getElementById('txEmoji').textContent = v ? emojiFor(v, txJenis) : EMO[txJenis]; }
 function setTxJenis(jn) {
     txJenis = jn;
     document.querySelectorAll('#txSeg button').forEach(b => b.classList.toggle('on', b.dataset.j === jn));
@@ -1264,8 +1119,6 @@ async function submitTx() {
     try {
         const res = await apiPost({ action: txEditId ? 'update' : 'insert', ID: txEditId || '', Tanggal: tgl, Jenis: txJenis, Kategori: kat, Nominal: nominal, Deskripsi: document.getElementById('txNote').value });
         if (res.status === 'success') {
-            const em = emojiMap(); em[kat] = document.getElementById('txEmoji').textContent;
-            try { localStorage.setItem('mb_emoji', JSON.stringify(em)); } catch (e) {}
             closeTx(); await loadData(); showToast('\u2713 Transaksi disimpan!');
         } else showToast('Gagal: ' + res.message, true);
     } catch (err) { showToast('Error: ' + err.message, true); }
@@ -1451,7 +1304,8 @@ function openCat(i) {
     document.getElementById('cHint').textContent = cIdx >= 0 ? 'Nama tidak bisa diubah agar transaksi dan budget lama tetap terhubung. Anda bisa mengganti ikon atau menghapusnya.' : '';
     document.getElementById('cDel').style.display = cIdx >= 0 ? 'block' : 'none';
     document.getElementById('cEmoji').textContent = cIdx >= 0 ? emojiFor(name, cTab) : EMO[cTab];
-    document.getElementById('cPick').innerHTML = EMOJIS.map(e => `<span onclick="document.getElementById('cEmoji').textContent='${e}';document.getElementById('cPick').classList.remove('open')">${e}</span>`).join('');
+    document.getElementById('cPick').innerHTML = emojiPickerHtml('cEmoji');
+    document.getElementById('cPick').scrollTop = 0;
     document.getElementById('cPick').classList.remove('open');
     document.getElementById('cSheet').classList.add('open');
 }
