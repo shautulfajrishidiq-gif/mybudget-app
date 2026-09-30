@@ -6,7 +6,6 @@
     <title>MyBudget</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="logo.png">
@@ -288,7 +287,7 @@
         @media (min-width:768px){ .page{ max-width:900px; margin:0 auto; } }
 
         /* ===== Tahap 1: Overview, filter periode, sheet transaksi ===== */
-        #page-dashboard > div:first-child > div:last-child { display:none; }
+        #page-dashboard > div:first-child > div:last-child { display:none !important; }
         .pw { position:relative; }
         #periodBtn { display:flex; align-items:center; gap:8px; background:var(--card); border:none; border-radius:999px; padding:10px 16px; color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
         #periodMenu { position:absolute; right:0; top:48px; width:236px; background:rgba(44,44,46,.97); backdrop-filter:blur(20px); border-radius:26px; padding:8px; z-index:60; display:none; box-shadow:0 14px 40px rgba(0,0,0,.7); }
@@ -303,7 +302,7 @@
         .bal { padding:20px; }
         .bal .t { color:#fff; font-weight:800; font-size:16px; }
         .bal .v { color:#fff; font-weight:800; font-size:26px; margin:6px 0 2px; }
-        .bal .v small { color:var(--muted); font-size:12px; font-weight:600; }
+        .bal .v small { display:block; margin-top:4px; color:var(--muted); font-size:12px; font-weight:600; }
         .dsh { position:relative; border-top:2px dashed #3a3a3c; margin:16px 0; }
         .dsh:before, .dsh:after { content:''; position:absolute; top:-12px; width:22px; height:22px; border-radius:50%; background:#000; }
         .dsh:before { left:-31px; } .dsh:after { right:-31px; }
@@ -338,9 +337,6 @@
         .sh-r.x { color:var(--blue); }
         .sh-e { position:relative; width:104px; height:104px; margin:22px auto 8px; border-radius:50%; background:#2c2c2e; display:flex; align-items:center; justify-content:center; font-size:48px; cursor:pointer; }
         .sh-e i { position:absolute; right:0; bottom:0; width:30px; height:30px; border-radius:50%; background:var(--blue); font-size:12px; display:flex; align-items:center; justify-content:center; color:#fff; }
-        #emojiPick { display:none; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:10px; }
-        #emojiPick.open { display:flex; }
-        #emojiPick span { font-size:26px; padding:6px; border-radius:12px; background:#2c2c2e; cursor:pointer; }
         .sh-c { background:#2c2c2e; border-radius:28px; padding:6px 16px; margin-bottom:6px; }
         .sh-a { display:flex; align-items:center; gap:8px; padding:14px 0 6px; }
         .sh-a span { color:#8e8e93; font-size:28px; font-weight:800; }
@@ -396,9 +392,15 @@
         #cSheet { position:fixed; inset:0; z-index:1500; background:rgba(0,0,0,.6); display:none; }
         #cSheet.open { display:block; }
         #cName { max-width:65%; color:#fff !important; }
-        #cPick { display:none; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:10px; }
-        #cPick.open { display:flex; }
-        #cPick span { font-size:26px; padding:6px; border-radius:12px; background:#2c2c2e; cursor:pointer; }
+        #cPick { display:none; margin-bottom:10px; max-height:260px; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:2px; }
+        #cPick.open { display:block; }
+        #cPick .eg { font-size:12px; font-weight:700; color:var(--muted); margin:10px 4px 6px; }
+        #cPick .ec { display:flex; flex-wrap:wrap; gap:6px; }
+        #cPick span.em { font-size:26px; padding:6px; border-radius:12px; background:#2c2c2e; cursor:pointer; }
+        /* Perbaikan: sembunyikan filter Tahun/Bulan lama (menang atas style inline) */
+        #page-dashboard > div:first-child > div:last-child { display:none !important; }
+        #ovRec ~ * { display:none !important; }
+        .bal .v small { display:block; margin-top:4px; }
     </style>
 </head>
 <body>
@@ -527,65 +529,6 @@
             <div id="ovBal"></div>
             <div class="ov-h">Top Categories</div><div id="ovTop"></div>
             <div class="ov-h">Recent Transactions</div><div id="ovRec"></div>
-            <div class="ov-h">Details</div>
-            <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-bottom:12px">
-                <div class="stat-card" style="background:linear-gradient(135deg,#15803d,#166534); color:white">
-                    <div class="stat-label"><i class="fa-solid fa-arrow-trend-up"></i><span>Income</span></div>
-                    <div class="stat-value" id="dash-income">Rp 0</div>
-                </div>
-                <div class="stat-card" style="background:linear-gradient(135deg,#991b1b,#7f1d1d); color:white">
-                    <div class="stat-label"><i class="fa-solid fa-arrow-trend-down"></i><span>Expenses</span></div>
-                    <div class="stat-value" id="dash-expenses">Rp 0</div>
-                </div>
-                <div class="stat-card" style="background:linear-gradient(135deg,#1e40af,#1e3a8a); color:white">
-                    <div class="stat-label"><i class="fa-solid fa-piggy-bank"></i><span>Savings</span></div>
-                    <div class="stat-value" id="dash-savings">Rp 0</div>
-                </div>
-                <div class="stat-card" style="background:white; border:1px solid #e2e8f0">
-                    <div class="stat-label" style="color:#64748b; opacity:1"><i class="fa-solid fa-percent" style="color:#0284c7"></i><span>Rate</span></div>
-                    <div class="stat-value" style="color:#0284c7" id="dash-rate">0%</div>
-                </div>
-            </div>
-
-            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:14px">
-                <div id="breakdown-income"></div>
-                <div id="breakdown-expenses"></div>
-                <div id="breakdown-savings"></div>
-            </div>
-
-            <div style="background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0; margin-bottom:10px">
-                <p style="font-size:10px; font-weight:700; color:#64748b; margin:0 0 8px; display:flex; align-items:center; gap:4px">
-                    <i class="fa-solid fa-arrow-trend-up" style="color:#15803d; font-size:11px"></i><span>Top Income</span>
-                </p>
-                <div style="height:140px; display:flex; align-items:center; justify-content:center">
-                    <canvas id="chartIncome"></canvas>
-                </div>
-            </div>
-
-            <div style="background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0; margin-bottom:10px">
-                <p style="font-size:10px; font-weight:700; color:#64748b; margin:0 0 8px; display:flex; align-items:center; gap:4px">
-                    <i class="fa-solid fa-arrow-trend-down" style="color:#991b1b; font-size:11px"></i><span>Top Expenses</span>
-                </p>
-                <div style="height:140px; display:flex; align-items:center; justify-content:center">
-                    <canvas id="chartExpenses"></canvas>
-                </div>
-            </div>
-
-            <div style="background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0; margin-bottom:10px">
-                <p style="font-size:10px; font-weight:700; color:#64748b; margin:0 0 8px; display:flex; align-items:center; gap:4px">
-                    <i class="fa-solid fa-piggy-bank" style="color:#1e40af; font-size:11px"></i><span>Top Savings</span>
-                </p>
-                <div style="height:140px; display:flex; align-items:center; justify-content:center">
-                    <canvas id="chartSavings"></canvas>
-                </div>
-            </div>
-
-            <div style="background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0">
-                <p style="font-size:10px; font-weight:700; color:#64748b; margin:0 0 8px">Aktual per Bulan</p>
-                <div style="height:180px">
-                    <canvas id="chartMonthly"></canvas>
-                </div>
-            </div>
         </div>
 
         <!-- ============ PAGE: SETUP ============ -->
@@ -806,12 +749,11 @@
 <button id="fabAdd" onclick="fabAction()" aria-label="Tambah transaksi"><i class="fa-solid fa-plus"></i></button>
 <div id="txSheet"><div class="sh-p">
   <div class="sh-top"><button class="sh-r x" onclick="closeTx()"><i class="fa-solid fa-xmark"></i></button><div class="ti" id="txTitle">New Transaction</div><button class="sh-r" id="txGo" onclick="submitTx()"><i class="fa-solid fa-arrow-up"></i></button></div>
-  <div class="sh-e" onclick="document.getElementById('emojiPick').classList.toggle('open')"><span id="txEmoji">🛒</span><i class="fa-solid fa-pencil"></i></div>
-  <div id="emojiPick"></div>
+  <div class="sh-e" style="cursor:default"><span id="txEmoji">🛒</span></div>
   <div class="sh-c"><div class="sh-a"><span>IDR</span><input id="txAmt" inputmode="numeric" placeholder="0" autocomplete="off"></div>
     <div class="seg" id="txSeg"><button data-j="Expenses" onclick="setTxJenis('Expenses')">Expense</button><button data-j="Income" onclick="setTxJenis('Income')">Income</button><button data-j="Savings" onclick="setTxJenis('Savings')">Savings</button></div></div>
   <div class="sh-l">Assignment</div>
-  <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#4a8af4"><i class="fa-solid fa-tag"></i></span><b>Category</b><select id="txCat"></select></label></div>
+  <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#4a8af4"><i class="fa-solid fa-tag"></i></span><b>Category</b><select id="txCat" onchange="txCatChange()"></select></label></div>
   <div class="sh-l">Schedule</div>
   <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#5b8def"><i class="fa-solid fa-calendar"></i></span><b>Date</b><input type="date" id="txDate" onchange="fillTxCat()"></label></div>
   <textarea id="txNote" placeholder="Notes (optional)"></textarea>
