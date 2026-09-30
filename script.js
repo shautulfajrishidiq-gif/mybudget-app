@@ -289,7 +289,7 @@ function showPage(page) {
     document.querySelectorAll('.mob-btn').forEach(b => {
         const isActive = b.dataset.page === page;
         b.classList.toggle('active', isActive);
-        b.style.color = isActive ? '#38bdf8' : '';
+        b.style.color = isActive ? '#4a8af4' : '';
     });
     const titleEl = document.getElementById('mobilePageTitle');
     if (titleEl) titleEl.textContent = PAGE_TITLES[page] || page;
@@ -583,7 +583,7 @@ function makeMonthlyBar(filtered) {
             options: {
                 responsive: true, maintainAspectRatio: true,
                 plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => formatRp(c.raw) }, padding: 8, titleFont: { size: 11 }, bodyFont: { size: 10 } } },
-                scales: { y: { ticks: { callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', font: { size: 9 } }, grid: { color: '#f1f5f9' }, beginAtZero: true }, x: { ticks: { font: { size: 10 } } } }
+                scales: { y: { ticks: { callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', font: { size: 9 } }, grid: { color: '#2c2c2e' }, beginAtZero: true }, x: { ticks: { font: { size: 10 } } } }
             }
         });
     } else {
@@ -602,7 +602,7 @@ function makeMonthlyBar(filtered) {
             options: {
                 responsive: true, maintainAspectRatio: true,
                 plugins: { legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 8, padding: 6, usePointStyle: true } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + formatRp(c.raw) }, padding: 8, titleFont: { size: 11 }, bodyFont: { size: 10 } } },
-                scales: { y: { ticks: { callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', font: { size: 9 } }, grid: { color: '#f1f5f9' }, beginAtZero: true, stacked: false }, x: { ticks: { font: { size: 9 } }, stacked: false } }
+                scales: { y: { ticks: { callback: v => 'Rp' + (v / 1e6).toFixed(0) + 'jt', font: { size: 9 } }, grid: { color: '#2c2c2e' }, beginAtZero: true, stacked: false }, x: { ticks: { font: { size: 9 } }, stacked: false } }
             }
         });
     }
