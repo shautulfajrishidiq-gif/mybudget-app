@@ -1093,7 +1093,28 @@ function setPeriod(p) { ovPeriod = p; renderPeriodMenu(); if (p !== 'custom') { 
 function applyCustom() { ovFrom = document.getElementById('pmFrom').value; ovTo = document.getElementById('pmTo').value; if (!ovFrom || !ovTo) { showToast('Isi tanggal awal dan akhir.', true); return; } document.getElementById('periodMenu').classList.remove('open'); renderPeriodMenu(); renderDashboard(); }
 document.addEventListener('click', e => { const m = document.getElementById('periodMenu'); if (m && !m.contains(e.target)) m.classList.remove('open'); });
 
+// Sisa budget per transaksi (Expenses & Savings): budget kategori di bulan transaksi dikurangi total terpakai bulan itu
+let _sisaC = null;
+function sisaHtml(i) {
+    if (i.Jenis !== 'Expenses' && i.Jenis !== 'Savings') return '';
+    if (!i.Tanggal) return '';
+    const d = parseTanggal(i.Tanggal), m = d.getMonth() + 1, y = d.getFullYear();
+    const b = dataBudget.find(x => x.Jenis === i.Jenis && x.Kategori === i.Kategori && Number(x.Bulan) === m && Number(x.Tahun) === y && Number(x.Budget) > 0);
+    if (!b) return '';
+    _sisaC = _sisaC || {};
+    const key = i.Jenis + '|' + m + '|' + y;
+    const act = _sisaC[key] || (_sisaC[key] = getActualByCategory(i.Jenis, m, y));
+    const rem = Number(b.Budget) - Number(act[i.Kategori] || 0);
+    const base = 'display:block;font-size:12px;font-weight:700;margin-top:3px;';
+    if (rem < 0) {
+        const c = i.Jenis === 'Savings' ? '#4a8af4' : '#ff5a5f';
+        return `<span style="${base}color:${c}">Lebih ${idr(-rem)}</span>`;
+    }
+    return `<span style="${base}color:#8e8e93">${i.Jenis === 'Savings' ? 'Target sisa ' : 'Sisa '}${idr(rem)}</span>`;
+}
+
 function renderOverview() {
+    _sisaC = null;
     const sum = (a, k) => a.filter(i => i.Jenis === k).reduce((s, i) => s + Number(i.Nominal), 0);
     const bal = sum(dataTransaksi, 'Income') - sum(dataTransaksi, 'Expenses') - sum(dataTransaksi, 'Savings');
     const per = getOverviewData(), spent = sum(per, 'Expenses');
@@ -1115,7 +1136,7 @@ function renderOverview() {
     const rec = per.slice().sort((a, b) => parseTanggal(b.Tanggal) - parseTanggal(a.Tanggal) || String(b.Timestamp).localeCompare(String(a.Timestamp))).slice(0, 5);
     document.getElementById('ovRec').innerHTML = rec.length ? '<div class="rt">' + rec.map(i => {
         const inc = i.Jenis === 'Income', dt = parseTanggal(i.Tanggal).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        return `<div class="rr"><div class="e">${emojiFor(i.Kategori, i.Jenis)}</div><div class="m"><b>${esc(i.Deskripsi || i.Kategori)}</b><em>${esc(i.Kategori)}</em></div><div class="a"><b style="color:${inc ? '#4a8af4' : '#fff'}">${inc ? '+' : '-'}${idr(i.Nominal)}</b><em>${dt}</em></div></div>`;
+        return `<div class="rr"><div class="e">${emojiFor(i.Kategori, i.Jenis)}</div><div class="m"><b>${esc(i.Deskripsi || i.Kategori)}</b><em>${esc(i.Kategori)}</em></div><div class="a"><b style="color:${inc ? '#4a8af4' : '#fff'}">${inc ? '+' : '-'}${idr(i.Nominal)}</b>${sisaHtml(i)}<em>${dt}</em></div></div>`;
     }).join('') + '</div>' : '<div class="rt emp">Belum ada transaksi di periode ini</div>';
 }
 
@@ -1179,9 +1200,10 @@ function fabAction() { const p = document.querySelector('.page.active'); if (p &
 function ymd(t) { const d = parseTanggal(t), p = v => String(v).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
 function rowHtml(i) {
     const inc = i.Jenis === 'Income', dt = parseTanggal(i.Tanggal).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `<div class="rr" onclick="openTx('${i.ID}')"><div class="e">${emojiFor(i.Kategori, i.Jenis)}</div><div class="m"><b>${esc(i.Deskripsi || i.Kategori)}</b><em>${esc(i.Kategori)}</em></div><div class="a"><b style="color:${inc ? '#4a8af4' : '#fff'}">${inc ? '+' : '-'}${idr(i.Nominal)}</b><em>${dt}</em></div></div>`;
+    return `<div class="rr" onclick="openTx('${i.ID}')"><div class="e">${emojiFor(i.Kategori, i.Jenis)}</div><div class="m"><b>${esc(i.Deskripsi || i.Kategori)}</b><em>${esc(i.Kategori)}</em></div><div class="a"><b style="color:${inc ? '#4a8af4' : '#fff'}">${inc ? '+' : '-'}${idr(i.Nominal)}</b>${sisaHtml(i)}<em>${dt}</em></div></div>`;
 }
 function renderHistory() {
+    _sisaC = null;
     const el = document.getElementById('hist'); if (!el) return;
     const q = hSearch.trim().toLowerCase();
     const d = dataTransaksi.filter(i => i.Tanggal && (hJenis === 'all' || i.Jenis === hJenis) && (!q || (i.Kategori + ' ' + i.Deskripsi).toLowerCase().includes(q)))
@@ -1199,20 +1221,61 @@ function renderHistory() {
 }
 document.addEventListener('click', () => { const f = document.getElementById('fMenu'); if (f) f.classList.remove('open'); });
 
+function idrS(n) { return (n < 0 ? '-' : '') + idr(Math.abs(n)); }
+// Perkecil huruf angka ringkasan otomatis sampai muat di dalam kartu (tidak keluar jalur)
+function fitStatValues(root) {
+    if (!root || !root.clientWidth) return;
+    const fit = (v, base) => {
+        let sz = base; v.style.fontSize = sz + 'px';
+        while (v.scrollWidth > v.clientWidth + 1 && sz > 9) { sz -= 0.5; v.style.fontSize = sz + 'px'; }
+    };
+    root.querySelectorAll('.stat-value').forEach(v => fit(v, 17));
+    root.querySelectorAll('.tc .n b').forEach(v => fit(v, 13));
+}
+window.addEventListener('resize', () => { const el = document.getElementById('bud'); if (el) fitStatValues(el); });
+
 function renderBudgets() {
     const el = document.getElementById('bud'); if (!el) return;
     const [y, m] = bMonth.split('-').map(Number);
-    const items = dataBudget.filter(b => b.Jenis === bJenisTab && Number(b.Bulan) === m && Number(b.Tahun) === y && Number(b.Budget) > 0);
-    const act = getActualByCategory(bJenisTab, m, y) || {};
-    const planned = items.reduce((t, b) => t + Number(b.Budget), 0), used = items.reduce((t, b) => t + Number(act[b.Kategori] || 0), 0);
+    const sumB = jn => dataBudget.filter(b => b.Jenis === jn && Number(b.Bulan) === m && Number(b.Tahun) === y && Number(b.Budget) > 0).reduce((t, b) => t + Number(b.Budget), 0);
+    const actInc = getActualByCategory('Income', m, y) || {};
+    const received = Object.values(actInc).reduce((t, v) => t + v, 0);
+    const allocated = sumB('Expenses') + sumB('Savings');
+    const unalloc = received - allocated;
     const lbl = new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    el.innerHTML = `<div class="hh"><h2>Budgets</h2><label class="mp">${lbl}<input type="month" value="${bMonth}" onchange="bMonth=this.value||bMonth;renderBudgets()"></label></div>
-        <div class="tabs"><button class="${bJenisTab === 'Expenses' ? 'on' : ''}" onclick="bJenisTab='Expenses';renderBudgets()">Expenses</button><button class="${bJenisTab === 'Savings' ? 'on' : ''}" onclick="bJenisTab='Savings';renderBudgets()">Savings</button></div>
-        <div class="g2"><div class="stat-card b"><div class="stat-label"><i class="fa-solid fa-equals"></i><span>Planned</span></div><div class="stat-value">${idr(planned)}</div></div>
-        <div class="stat-card g"><div class="stat-label"><i class="fa-solid fa-check"></i><span>Remaining</span></div><div class="stat-value">${idr(planned - used)}</div></div></div>
-        <div class="g2" style="margin-top:10px">${items.map(b => { const a = Number(act[b.Kategori] || 0), bv = Number(b.Budget), p = Math.min(100, a / bv * 100);
-            return `<div class="tc bc" onclick="openBud('${esc(b.Kategori).replace(/'/g, "\\'")}')"><div class="n"><span>${emojiFor(b.Kategori, b.Jenis)}</span><div><em>${esc(b.Kategori)}</em><b>${idr(a)}</b></div></div><div class="bar"><i style="width:${p}%;background:${a > bv ? '#e5484d' : '#4a8af4'}"></i></div><small>of ${idr(bv)} budget</small></div>`; }).join('')}</div>
-        ${items.length ? '' : '<div class="emp">Belum ada budget bulan ini.<br>Tekan + untuk membuat.</div>'}`;
+    const tabBtn = (jn, t) => `<button class="${bJenisTab === jn ? 'on' : ''}" onclick="bJenisTab='${jn}';renderBudgets()">${t}</button>`;
+    const head = `<div class="hh"><h2>Budgets</h2><label class="mp">${lbl}<input type="month" value="${bMonth}" onchange="bMonth=this.value||bMonth;renderBudgets()"></label></div>
+        <div class="tabs">${tabBtn('Income', 'Income')}${tabBtn('Expenses', 'Expenses')}${tabBtn('Savings', 'Savings')}</div>`;
+    const strip = (t, v, warn) => `<div class="bstrip"><span>${t}</span><b${warn ? ' class="warn"' : ''}>${v}</b></div>`;
+    let body = '';
+    if (bJenisTab === 'Income') {
+        const cats = [...new Set([...(kategoriForPeriod(m, y).Income || []), ...Object.keys(actInc)])];
+        cats.sort((a, b) => (actInc[b] || 0) - (actInc[a] || 0));
+        body = `<div class="g2"><div class="stat-card b"><div class="stat-label"><i class="fa-solid fa-arrow-trend-up"></i><span>Received</span></div><div class="stat-value">${idr(received)}</div></div>
+            <div class="stat-card g"><div class="stat-label"><i class="fa-solid fa-check"></i><span>Unallocated</span></div><div class="stat-value"${unalloc < 0 ? ' style="color:#ffb020 !important"' : ''}>${idrS(unalloc)}</div></div></div>
+            ${strip('Dialokasikan (Expenses + Savings)', idr(allocated))}
+            ${unalloc < 0 ? strip('Alokasi melebihi income', idrS(unalloc), true) : ''}
+            <div class="g2" style="margin-top:10px">${cats.map(k => { const a = actInc[k] || 0, p = received > 0 ? a / received * 100 : 0;
+                return `<div class="tc bc"><div class="n"><span>${emojiFor(k, 'Income')}</span><div><em>${esc(k)}</em><b>${idr(a)}</b></div></div><div class="bar"><i style="width:${Math.min(100, p)}%;background:#4a8af4"></i></div><small>${Math.round(p)}% of income</small></div>`; }).join('')}</div>
+            ${cats.length ? '' : '<div class="emp">Belum ada income bulan ini.</div>'}`;
+    } else {
+        const items = dataBudget.filter(b => b.Jenis === bJenisTab && Number(b.Bulan) === m && Number(b.Tahun) === y && Number(b.Budget) > 0);
+        const act = getActualByCategory(bJenisTab, m, y) || {};
+        const planned = items.reduce((t, b) => t + Number(b.Budget), 0), used = items.reduce((t, b) => t + Number(act[b.Kategori] || 0), 0);
+        const sv = bJenisTab === 'Savings';
+        body = `<div class="g2"><div class="stat-card b"><div class="stat-label"><i class="fa-solid fa-equals"></i><span>Planned</span></div><div class="stat-value">${idr(planned)}</div></div>
+            <div class="stat-card g"><div class="stat-label"><i class="fa-solid fa-check"></i><span>Remaining</span></div><div class="stat-value">${idr(planned - used)}</div></div></div>
+            ${unalloc < 0 ? strip('Alokasi melebihi income', idrS(unalloc), true) : strip('Income belum teralokasikan', idr(unalloc))}
+            <div class="g2" style="margin-top:10px">${items.map(b => { const a = Number(act[b.Kategori] || 0), bv = Number(b.Budget), p = Math.min(100, a / bv * 100), rem = bv - a;
+                const line = rem < 0 ? `<small class="sisa" style="color:${sv ? '#4a8af4' : '#ff5a5f'}">Lebih ${idr(-rem)}</small>` : `<small class="sisa">${sv ? 'Target sisa ' : 'Sisa '}${idr(rem)}</small>`;
+                return `<div class="tc bc" onclick="openBud('${esc(b.Kategori).replace(/'/g, "\\'")}')"><div class="n"><span>${emojiFor(b.Kategori, b.Jenis)}</span><div><em>${esc(b.Kategori)}</em><b>${idr(a)}</b></div></div><div class="bar"><i style="width:${p}%;background:${a > bv ? '#e5484d' : '#4a8af4'}"></i></div>${line}<small class="of">of ${idr(bv)} budget</small></div>`; }).join('')}</div>
+            ${items.length ? '' : '<div class="emp">Belum ada budget bulan ini.<br>Tekan + untuk membuat.</div>'}`;
+    }
+    el.innerHTML = head + body;
+    fitStatValues(el);
+    // Tab Income hanya menampilkan (tanpa tombol +)
+    const fb = document.getElementById('fabAdd'), pg = document.getElementById('page-budget');
+    if (fb && pg && pg.classList.contains('active')) fb.style.display = bJenisTab === 'Income' ? 'none' : '';
 }
 
 function openTx(id) {
@@ -1245,7 +1308,7 @@ function openBud(kat) {
     document.getElementById('bDel').style.display = kat ? 'block' : 'none';
     document.getElementById('bInterval').style.display = kat ? 'none' : 'block';
     document.getElementById('bAmt').value = ''; document.getElementById('bEndOn').checked = false; document.getElementById('bEndRow').style.display = 'none'; document.getElementById('bRep').value = 'm';
-    setBudJenis(bJenisTab);
+    setBudJenis(bJenisTab === 'Income' ? 'Expenses' : bJenisTab);
     if (kat) {
         const [y, m] = bMonth.split('-').map(Number), b = dataBudget.find(x => x.Jenis === bJenisTab && x.Kategori === kat && Number(x.Bulan) === m && Number(x.Tahun) === y);
         const c = document.getElementById('bCat');
@@ -1342,8 +1405,8 @@ function openCat(i) {
     cIdx = (i === undefined) ? -1 : i;
     const name = cIdx >= 0 ? curCats()[cTab][cIdx] : '', inp = document.getElementById('cName');
     document.getElementById('cTitle').textContent = cIdx >= 0 ? 'Edit Category' : 'New Category';
-    inp.value = name || ''; inp.readOnly = cIdx >= 0;
-    document.getElementById('cHint').textContent = cIdx >= 0 ? 'Nama tidak bisa diubah agar transaksi dan budget lama tetap terhubung. Anda bisa mengganti ikon atau menghapusnya.' : '';
+    inp.value = name || ''; inp.readOnly = false;
+    document.getElementById('cHint').textContent = cIdx >= 0 ? 'Mengubah nama otomatis memperbarui transaksi dan budget bulan ini yang memakai kategori ini.' : '';
     document.getElementById('cDel').style.display = cIdx >= 0 ? 'block' : 'none';
     document.getElementById('cEmoji').textContent = cIdx >= 0 ? emojiFor(name, cTab) : EMO[cTab];
     document.getElementById('cPick').innerHTML = emojiPickerHtml('cEmoji');
@@ -1352,9 +1415,31 @@ function openCat(i) {
     document.getElementById('cSheet').classList.add('open');
 }
 function closeCat() { document.getElementById('cSheet').classList.remove('open'); }
+async function renameCat(old, nw, list) {
+    if (list.some((k, i) => i !== cIdx && k.toLowerCase() === nw.toLowerCase())) { flagField('cName'); showToast('Nama sudah dipakai.', true); return; }
+    if (!confirm('Ganti "' + old + '" menjadi "' + nw + '" untuk bulan ini? Transaksi dan budget bulan ini ikut diperbarui.')) return;
+    const [y, m] = cMonth.split('-').map(Number), v = curCats(), emoji = document.getElementById('cEmoji').textContent;
+    v[cTab][cIdx] = nw;
+    showSaving('Mengganti nama kategori...'); btnBusy('cGo', true);
+    try {
+        const res = await apiPost({ action: 'renameCategory', Jenis: cTab, Old: old, New: nw, Bulan: m, Tahun: y, Income: v.Income, Expenses: v.Expenses, Savings: v.Savings });
+        if (res.status === 'success') {
+            kategoriByPeriod[periodKey(m, y)] = { Income: v.Income.slice(), Expenses: v.Expenses.slice(), Savings: v.Savings.slice() };
+            daftarKategori = aggregateKategori(kategoriByPeriod);
+            const inMonth = t => { const d = parseTanggal(t); return d.getFullYear() === y && d.getMonth() + 1 === m; };
+            dataTransaksi.forEach(t => { if (t.Jenis === cTab && t.Kategori === old && t.Tanggal && inMonth(t.Tanggal)) t.Kategori = nw; });
+            dataBudget.forEach(b => { if (b.Jenis === cTab && b.Kategori === old && Number(b.Bulan) === m && Number(b.Tahun) === y) b.Kategori = nw; });
+            const em = emojiMap(); em[nw] = emoji;
+            try { localStorage.setItem('mb_emoji', JSON.stringify(em)); } catch (e) {}
+            closeCat(); renderSettings(); renderLocal(); showToast('\u2713 Kategori diganti!');
+        } else showToast('Gagal: ' + res.message, true);
+    } catch (err) { showToast('Error: ' + err.message, true); }
+    finally { hideSaving(); btnBusy('cGo', false); }
+}
 function submitCat() {
     const name = document.getElementById('cName').value.trim(), list = curCats()[cTab];
     if (!name) { flagField('cName'); showToast('Isi nama kategori.', true); return; }
+    if (cIdx >= 0 && name !== list[cIdx]) { renameCat(list[cIdx], name, list); return; }
     const em = emojiMap(); em[name] = document.getElementById('cEmoji').textContent;
     if (cIdx >= 0) {
         try { localStorage.setItem('mb_emoji', JSON.stringify(em)); } catch (e) {}
