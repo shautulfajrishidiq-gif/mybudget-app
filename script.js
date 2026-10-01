@@ -187,7 +187,7 @@ function hideAuthModal() {
 
 async function doLogout() {
     if (!confirm('Keluar dari MyBudget?')) return;
-    try { localStorage.removeItem(AUTH_KEY); } catch(e) {}
+    try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); } catch(e) {}
     location.reload();
 }
 
@@ -205,41 +205,41 @@ function loadSession() {
 }
 
 // ==============================================
+// CACHE DATA (tampil instan saat web dibuka, lalu disegarkan di belakang layar)
+// ==============================================
+const CACHE_KEY = 'mybudget_cache_v1';
+function saveCache() {
+    try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+            email: currentUser.email,
+            result: { status: 'success', data: dataTransaksi, kategoriByPeriod: kategoriByPeriod, kategori: daftarKategori, budget: dataBudget }
+        }));
+    } catch (e) {}
+}
+function loadCache() {
+    try { const raw = localStorage.getItem(CACHE_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+}
+
+// ==============================================
 // INIT AUTH
 // ==============================================
 async function initAuth() {
-    // Cek API online
-    try {
-        const r = await fetch(API_URL + '?action=authStatus', { redirect: 'follow' });
-        const status = await r.json();
-        if (!status || status.status !== 'success' && status.status !== 'ok') {
-            throw new Error('API tidak merespons dengan benar');
-        }
-    } catch (err) {
+    const session = loadSession();
+    if (!(session && session.email && session.token)) {
         setLoading(false);
-        alert('GAGAL TERHUBUNG KE SERVER!\n\nError: ' + err.message +
-              '\n\nCek:\n1. Apps Script sudah di-deploy sebagai Web app\n2. Execute as: ME\n3. Who has access: Anyone\n\nURL: ' + API_URL);
+        showAuthModal('login');
         return false;
     }
-
-    // Cek session tersimpan
-    const session = loadSession();
-    if (session && session.email && session.token) {
-        currentUser = session;
-        // Verify token masih valid dengan ambil data
-        try {
-            const result = await apiGet('getData');
-            if (result.status === 'success') {
-                return true;
-            }
-        } catch(e) {
-            // Token expired, show login
-        }
+    currentUser = session;
+    const cache = loadCache();
+    if (cache && cache.email === session.email && cache.result) {
+        applyData(cache.result);          // tampil langsung dari data terakhir
+        refreshViews();
+        setLoading(false);
+        loadData(true);                   // segarkan di belakang layar (1x panggilan)
+        return false;                     // startup tidak perlu memuat ulang
     }
-
-    // Show login modal
-    showAuthModal('login');
-    return false;
+    return true;                          // belum ada cache: startup memanggil loadData() satu kali
 }
 
 document.getElementById('authForm').addEventListener('submit', async function (e) {
@@ -312,25 +312,43 @@ function showPage(page) {
 // ==============================================
 // LOAD DATA
 // ==============================================
+function renderAllData() {
+    populateTahunFilter();
+    renderDashboard();
+    renderTabel(dataTransaksi);
+    renderSisaAnggaran();
+    populateKategoriDropdown('Income');
+    warnaiJenis('Income');
+}
+
+function applyData(result) {
+    dataTransaksi = result.data || [];
+    if (result.kategoriByPeriod) {
+        kategoriByPeriod = result.kategoriByPeriod;
+        daftarKategori = aggregateKategori(kategoriByPeriod);
+    } else if (result.kategori) {
+        daftarKategori = result.kategori;
+    }
+    if (result.budget) dataBudget = result.budget;
+    renderAllData();
+}
+
+// Setelah simpan/hapus: perbarui tampilan dari data lokal tanpa mengambil ulang dari server
+function renderLocal() {
+    renderAllData();
+    refreshViews();
+    saveCache();
+}
+
 async function loadData(silent) {
     if (!silent) setLoading(true);
     try {
         const result = await apiGet('getData');
         if (result.status === 'success') {
-            dataTransaksi = result.data || [];
-            if (result.kategoriByPeriod) {
-                kategoriByPeriod = result.kategoriByPeriod;
-                daftarKategori = aggregateKategori(kategoriByPeriod);
-            } else if (result.kategori) {
-                daftarKategori = result.kategori;
-            }
-            if (result.budget) dataBudget = result.budget;
-            populateTahunFilter();
-            renderDashboard();
-            renderTabel(dataTransaksi);
-            renderSisaAnggaran();
-            populateKategoriDropdown('Income');
-            warnaiJenis('Income');
+            applyData(result);
+            saveCache();
+        } else if (/token|access denied/i.test(result.message || '')) {
+            showAuthModal('login');
         } else {
             showToast('Gagal memuat: ' + result.message, true);
         }
@@ -993,7 +1011,7 @@ async function hapusTransaksi(id) {
     showSaving('Menghapus transaksi...');
     try {
         const res = await apiPost({ action: 'delete', ID: id });
-        if (res.status === 'success') { await loadData(); showToast('\u2713 Transaksi dihapus!'); }
+        if (res.status === 'success') { dataTransaksi = dataTransaksi.filter(x => String(x.ID) !== String(id)); renderLocal(); showToast('\u2713 Transaksi dihapus!'); }
         else showToast('Gagal hapus: ' + res.message, true);
     } catch (err) { showToast('Error: ' + err.message, true); }
     finally { hideSaving(); }
@@ -1018,6 +1036,7 @@ warnaiJenis('Income');
         if (el && !el.classList.contains('hidden')) el.classList.add('hidden');
     }, 15000);
     try {
+        await new Promise(r => setTimeout(r, 0));   // tunggu seluruh script selesai dimuat
         const ok = await initAuth();
         if (ok) await loadData();
     } catch (err) {
@@ -1134,7 +1153,14 @@ async function submitTx() {
         const res = await apiPost({ action: txEditId ? 'update' : 'insert', ID: txEditId || '', Tanggal: tgl, Jenis: txJenis, Kategori: kat, Nominal: nominal, Deskripsi: document.getElementById('txNote').value });
         if (res.status === 'success') {
             closeTx(); showToast('\u2713 Transaksi disimpan!');
-            loadData(true);
+            if (res.id) {
+                const p2 = v => String(v).padStart(2, '0'), n = new Date();
+                const row = { ID: res.id, Tanggal: tgl, Jenis: txJenis, Kategori: kat, Nominal: Number(nominal), Deskripsi: document.getElementById('txNote').value,
+                    Timestamp: n.getFullYear() + '-' + p2(n.getMonth() + 1) + '-' + p2(n.getDate()) + ' ' + p2(n.getHours()) + ':' + p2(n.getMinutes()) + ':' + p2(n.getSeconds()) };
+                const idx = txEditId ? dataTransaksi.findIndex(x => String(x.ID) === String(txEditId)) : -1;
+                if (idx >= 0) { row.Timestamp = dataTransaksi[idx].Timestamp; dataTransaksi[idx] = row; } else dataTransaksi.push(row);
+                renderLocal();
+            } else loadData(true);
         } else showToast('Gagal: ' + res.message, true);
     } catch (err) { showToast('Error: ' + err.message, true); }
     finally { hideSaving(); btnBusy('txGo', false); }
@@ -1235,7 +1261,7 @@ async function saveBudgets(list, msg) {
     showSaving('Menyimpan budget...'); btnBusy('bGo', true);
     try {
         const res = await apiPost({ action: 'updateBudget', budgets: list });
-        if (res.status === 'success') { dataBudget = list; closeBud(); renderBudgets(); renderOverview(); showToast(msg); }
+        if (res.status === 'success') { dataBudget = list; saveCache(); closeBud(); renderBudgets(); renderOverview(); showToast(msg); }
         else showToast('Gagal: ' + res.message, true);
     } catch (err) { showToast('Error: ' + err.message, true); }
     finally { hideSaving(); btnBusy('bGo', false); }
@@ -1306,6 +1332,7 @@ async function saveCats(jn, arr, msg) {
         if (res.status === 'success') {
             kategoriByPeriod[periodKey(m, y)] = { Income: v.Income.slice(), Expenses: v.Expenses.slice(), Savings: v.Savings.slice() };
             daftarKategori = aggregateKategori(kategoriByPeriod);
+            saveCache();
             closeCat(); renderSettings(); refreshViews(); renderOverview(); showToast(msg);
         } else showToast('Gagal: ' + res.message, true);
     } catch (err) { showToast('Error: ' + err.message, true); }
