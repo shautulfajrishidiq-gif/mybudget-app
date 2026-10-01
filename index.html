@@ -4,13 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MyBudget</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="logo.png">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <style>
+        /* Reset dasar (pengganti preflight Tailwind CDN yang dihapus agar halaman lebih cepat) */
+        *, ::before, ::after { border-width: 0; border-style: solid; border-color: #e5e7eb; }
+        html { line-height: 1.5; -webkit-text-size-adjust: 100%; tab-size: 4; }
+        body { line-height: inherit; }
+        h1, h2, h3, h4, h5, h6 { font-size: inherit; font-weight: inherit; margin: 0; }
+        p, blockquote, dl, dd, figure, pre, hr { margin: 0; }
+        a { color: inherit; text-decoration: inherit; }
+        button, input, select, textarea { font-family: inherit; font-size: 100%; font-weight: inherit; line-height: inherit; color: inherit; margin: 0; padding: 0; }
+        button, select { text-transform: none; }
+        button, [type='button'], [type='submit'] { -webkit-appearance: button; background-color: transparent; background-image: none; }
+        ol, ul, menu { list-style: none; margin: 0; padding: 0; }
+        img, svg, video, canvas { display: block; vertical-align: middle; }
+        img, video { max-width: 100%; height: auto; }
+        textarea { resize: vertical; }
+        table { text-indent: 0; border-color: inherit; border-collapse: collapse; }
+        [hidden] { display: none; }
         * { box-sizing: border-box; }
         html, body { width: 100%; overflow-x: hidden; }
         
@@ -833,6 +848,6 @@ window.addEventListener('resize', applyLayout);
 })();
 </script>
 
-<script src="script.js"></script>
+<script src="script.js?v=20261001a"></script>
 </body>
 </html>
