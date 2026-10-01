@@ -1184,7 +1184,7 @@ function renderOverview() {
     const rec = per.slice().sort((a, b) => parseTanggal(b.Tanggal) - parseTanggal(a.Tanggal) || String(b.Timestamp).localeCompare(String(a.Timestamp))).slice(0, 5);
     document.getElementById('ovRec').innerHTML = rec.length ? '<div class="rt">' + rec.map(i => {
         const inc = i.Jenis === 'Income', dt = parseTanggal(i.Tanggal).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        return `<div class="rr"><div class="e">${emojiFor(i.Kategori, i.Jenis)}</div><div class="m"><b>${esc(i.Deskripsi || i.Kategori)}</b><em>${esc(i.Kategori)}</em></div><div class="a"><b style="color:${inc ? '#4a8af4' : '#fff'}">${inc ? '+' : '-'}${idr(i.Nominal)}</b>${sisaHtml(i)}<em>${dt}</em></div></div>`;
+        return `<div class="rr" onclick="openTx('${i.ID}')"><div class="e">${emojiFor(i.Kategori, i.Jenis)}</div><div class="m"><b>${esc(i.Deskripsi || i.Kategori)}</b><em>${esc(i.Kategori)}</em></div><div class="a"><b style="color:${inc ? '#4a8af4' : '#fff'}">${inc ? '+' : '-'}${idr(i.Nominal)}</b>${sisaHtml(i)}<em>${dt}</em></div></div>`;
     }).join('') + '</div>' : '<div class="rt emp">Belum ada transaksi di periode ini</div>';
 }
 
@@ -1472,26 +1472,26 @@ function openCat(i) {
     document.getElementById('cSheet').classList.add('open');
 }
 function closeCat() { document.getElementById('cSheet').classList.remove('open'); }
-async function renameCat(old, nw, list) {
+function renameCat(old, nw, list) {
     if (list.some((k, i) => i !== cIdx && k.toLowerCase() === nw.toLowerCase())) { flagField('cName'); showToast('Nama sudah dipakai.', true); return; }
-    if (!confirm('Ganti "' + old + '" menjadi "' + nw + '" untuk bulan ini? Transaksi dan budget bulan ini ikut diperbarui.')) return;
-    const [y, m] = cMonth.split('-').map(Number), v = curCats(), emoji = document.getElementById('cEmoji').textContent;
-    v[cTab][cIdx] = nw;
-    showSaving('Mengganti nama kategori...'); btnBusy('cGo', true);
-    try {
-        const res = await apiPost({ action: 'renameCategory', Jenis: cTab, Old: old, New: nw, Bulan: m, Tahun: y, Income: v.Income, Expenses: v.Expenses, Savings: v.Savings });
-        if (res.status === 'success') {
-            kategoriByPeriod[periodKey(m, y)] = { Income: v.Income.slice(), Expenses: v.Expenses.slice(), Savings: v.Savings.slice() };
-            daftarKategori = aggregateKategori(kategoriByPeriod);
-            const inMonth = t => { const d = parseTanggal(t); return d.getFullYear() === y && d.getMonth() + 1 === m; };
-            dataTransaksi.forEach(t => { if (t.Jenis === cTab && t.Kategori === old && t.Tanggal && inMonth(t.Tanggal)) t.Kategori = nw; });
-            dataBudget.forEach(b => { if (b.Jenis === cTab && b.Kategori === old && Number(b.Bulan) === m && Number(b.Tahun) === y) b.Kategori = nw; });
-            const em = emojiMap(); em[nw] = emoji;
-            try { localStorage.setItem('mb_emoji', JSON.stringify(em)); } catch (e) {}
-            closeCat(); renderSettings(); renderLocal(); showToast('\u2713 Kategori diganti!');
-        } else showToast('Gagal: ' + res.message, true);
-    } catch (err) { showToast('Error: ' + err.message, true); }
-    finally { hideSaving(); btnBusy('cGo', false); }
+    const nTx = dataTransaksi.filter(t => t.Jenis === cTab && t.Kategori === old).length;
+    if (!confirm('Ganti "' + old + '" menjadi "' + nw + '"?\n' + nTx + ' transaksi (semua bulan) dan budget-nya ikut diperbarui.')) return;
+    const [y, m] = cMonth.split('-').map(Number), v = curCats(), emoji = document.getElementById('cEmoji').textContent, jn = cTab;
+    v[jn][cIdx] = nw;
+    // Terapkan langsung di layar (semua bulan)
+    kategoriByPeriod[periodKey(m, y)] = { Income: v.Income.slice(), Expenses: v.Expenses.slice(), Savings: v.Savings.slice() };
+    Object.keys(kategoriByPeriod).forEach(k => {
+        const l = kategoriByPeriod[k][jn]; if (!l) return;
+        const i = l.indexOf(old); if (i < 0) return;
+        if (l.indexOf(nw) >= 0) l.splice(i, 1); else l[i] = nw;
+    });
+    daftarKategori = aggregateKategori(kategoriByPeriod);
+    dataTransaksi.forEach(t => { if (t.Jenis === jn && t.Kategori === old) t.Kategori = nw; });
+    dataBudget.forEach(b => { if (b.Jenis === jn && b.Kategori === old) b.Kategori = nw; });
+    const em = emojiMap(); em[nw] = emoji;
+    try { localStorage.setItem('mb_emoji', JSON.stringify(em)); } catch (e) {}
+    saveCache(); closeCat(); renderSettings(); renderLocal(); refreshViews();
+    syncEnqueue({ run: () => apiPost({ action: 'renameCategory', Jenis: jn, Old: old, New: nw, Bulan: m, Tahun: y, Income: v.Income, Expenses: v.Expenses, Savings: v.Savings }) });
 }
 function submitCat() {
     const name = document.getElementById('cName').value.trim(), list = curCats()[cTab];
