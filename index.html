@@ -280,13 +280,13 @@
         .stat-card:nth-child(3) .stat-label i { background:linear-gradient(#8fe0a6,#3fb968); }
         .stat-card:nth-child(4) .stat-label i { background:linear-gradient(#c3a6ff,#8a63e8); }
 
-        /* Bottom nav mengambang */
-        #mobile-nav { left:16px !important; right:16px !important; bottom:calc(14px + env(safe-area-inset-bottom)) !important; height:66px !important; background:rgba(28,28,30,.92) !important; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,.1) !important; border-radius:999px; padding:5px; gap:2px; box-shadow:0 10px 30px rgba(0,0,0,.6) !important; }
-        .mob-btn { color:#fff; font-size:11px; font-weight:700; border-radius:999px; gap:4px; }
+        /* Bottom nav menempel penuh di dasar layar */
+        #mobile-nav { left:0 !important; right:0 !important; bottom:0 !important; height:calc(64px + env(safe-area-inset-bottom)) !important; background:#1c1c1e !important; backdrop-filter:none; -webkit-backdrop-filter:none; border:none !important; border-top:1px solid rgba(255,255,255,.1) !important; border-radius:0 !important; padding:6px 10px calc(6px + env(safe-area-inset-bottom)); gap:4px; box-shadow:none !important; }
+        .mob-btn { color:#fff; font-size:11px; font-weight:700; border-radius:18px; gap:4px; padding:4px 2px; }
         .mob-btn i { font-size:20px; }
         .mob-btn.active { background:#0a0a0a; color:var(--blue) !important; }
-        #main-content { padding-bottom:100px !important; }
-        #toast { bottom:100px; background:var(--card2); border-radius:14px; }
+        #main-content { padding-bottom:calc(160px + env(safe-area-inset-bottom)) !important; }
+        #toast { bottom:calc(84px + env(safe-area-inset-bottom)); background:var(--card2); border-radius:14px; }
 
         /* Modal login & overlay */
         #authModal { background:#000; }
@@ -341,7 +341,7 @@
         .rr .m em, .rr .a em { font-style:normal; color:var(--muted); font-size:12px; font-weight:600; }
         .rr .a { text-align:right; } .rr .a b { color:#fff; font-size:14px; display:block; }
         .emp { color:var(--muted); text-align:center; padding:22px 0; font-size:13px; }
-        #fabAdd { position:fixed; right:20px; bottom:calc(100px + env(safe-area-inset-bottom)); width:58px; height:58px; border-radius:50%; border:none; background:linear-gradient(#6aa3ff,#3d7cf0); color:#fff; font-size:24px; z-index:45; box-shadow:0 8px 24px rgba(74,138,244,.5); }
+        #fabAdd { position:fixed; right:20px; bottom:calc(84px + env(safe-area-inset-bottom)); width:58px; height:58px; border-radius:50%; border:none; background:linear-gradient(#6aa3ff,#3d7cf0); color:#fff; font-size:24px; z-index:45; box-shadow:0 8px 24px rgba(74,138,244,.5); }
         #txSheet { position:fixed; inset:0; z-index:1500; background:rgba(0,0,0,.6); display:none; }
         #txSheet.open { display:block; }
         .sh-p { position:absolute; left:0; right:0; bottom:0; top:36px; background:#1c1c1e; border-radius:38px 38px 0 0; padding:16px 16px 40px; overflow-y:auto; animation:shUp .25s ease; }
@@ -379,12 +379,31 @@
         .mp { position:relative; background:var(--card); border-radius:999px; padding:11px 18px; color:#fff; font-weight:700; font-size:14px; }
         .mp input { position:absolute; inset:0; width:100% !important; height:100%; opacity:0; }
         .g2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        #hist .g2 { grid-template-columns:1fr; }  /* History: Income, Expenses, Savings masing-masing 1 baris */
         .stat-card.g .stat-label i { background:linear-gradient(#8fe0a6,#3fb968) !important; }
         .stat-card.b .stat-label i { background:linear-gradient(#7db4ff,#4a8af4) !important; }
+        /* History: ringkasan Income / Expenses / Savings masing-masing 1 baris ramping */
+        #hist .g2 { grid-template-columns:1fr !important; gap:8px !important; }
+        #hist .g2 .stat-card { grid-column:auto !important; min-height:0 !important; padding:10px 78px 10px 16px !important; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+        #hist .g2 .stat-card .stat-label i { width:56px !important; height:100% !important; top:0 !important; right:0 !important; font-size:20px !important; border-radius:26px !important; }
+        #hist .g2 .stat-card .stat-value { font-size:17px !important; text-align:right; white-space:nowrap; }
         .mh { color:#fff; font-weight:800; font-size:16px; margin:20px 4px 8px; }
         .srch { width:100%; margin:0 0 10px; padding:12px 16px !important; font-size:15px; }
         .fm { position:absolute; right:0; top:50px; width:200px; background:rgba(44,44,46,.97); border-radius:24px; padding:8px; z-index:60; display:none; box-shadow:0 14px 40px rgba(0,0,0,.7); }
         .fm.open { display:block; }
+        /* Budgets: kartu ringkasan Opsi 1 (ikon kecil, angka di bawah, muat otomatis) */
+        #bud .stat-card { padding:12px 12px 14px !important; min-height:0 !important; }
+        #bud .stat-card .stat-label { display:block; min-height:34px; }
+        #bud .stat-card .stat-label i { width:38px !important; height:34px !important; top:0 !important; right:0 !important; font-size:15px !important; border-radius:14px !important; }
+        #bud .stat-card .stat-value { display:block; white-space:nowrap; margin-top:6px; }
+        .bstrip { margin:10px 0 2px; background:var(--card); border-radius:20px; padding:11px 16px; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13px; font-weight:700; }
+        .bstrip span { color:var(--muted); min-width:0; } .bstrip b { color:#4a8af4; white-space:nowrap; } .bstrip b.warn { color:#ffb020; }
+        /* Header atas dihapus (Refresh & Logout ada di Settings) */
+        #mobile-header { display:none !important; }
+        body.has-mobile-header { padding-top:calc(14px + env(safe-area-inset-top)) !important; }
+        #bud .g2 { grid-template-columns:repeat(2,minmax(0,1fr)); } #bud .tc { min-width:0; } #bud .tc .n div { min-width:0; flex:1; }
+        #bud .tc .n b { display:block; white-space:nowrap; }
+        .tc small.sisa { margin-top:8px; font-weight:800; color:#fff; } .tc small.of { margin-top:2px; }
         .tabs { display:flex; background:var(--card); border-radius:999px; padding:4px; margin:14px 0; }
         .tabs button { flex:1; border:none; background:none; color:#fff; font-weight:700; padding:10px 0; border-radius:999px; font-size:14px; }
         .tabs button.on { background:#3a3a3c; }
@@ -809,7 +828,7 @@ function applyLayout() {
     document.getElementById('mobile-header').style.display = isDesktop ? 'none' : 'flex';
     document.getElementById('mobile-nav').style.display = isDesktop ? 'none' : 'flex';
     document.getElementById('main-content').style.marginLeft = isDesktop ? '220px' : '0';
-    document.getElementById('main-content').style.paddingBottom = isDesktop ? '0' : '100px';
+    document.getElementById('main-content').style.paddingBottom = isDesktop ? '0' : 'calc(160px + env(safe-area-inset-bottom))';
     document.body.classList.toggle('has-mobile-header', !isDesktop);
 }
 applyLayout();
@@ -848,6 +867,6 @@ window.addEventListener('resize', applyLayout);
 })();
 </script>
 
-<script src="script.js?v=20261001a"></script>
+<script src="script.js?v=20261001c"></script>
 </body>
 </html>
