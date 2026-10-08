@@ -8,6 +8,8 @@ const API_URL = "https://script.google.com/macros/s/AKfycbx7GrPn3k5UL3buJqwim7fh
 // AUTH STATE
 // ==============================================
 const AUTH_KEY = 'mybudget_session';
+// Samakan dengan GOOGLE_CLIENT_ID di Code.gs (kosong = tombol Google disembunyikan)
+const GOOGLE_CLIENT_ID = '';
 let currentUser = { email: '', isDev: false, token: '' };
 
 // ==============================================
@@ -106,6 +108,15 @@ const formatNum = (n) => new Intl.NumberFormat('id-ID').format(Number(n) || 0);
 async function apiGet(action) {
     const params = new URLSearchParams({ action, email: currentUser.email, token: currentUser.token });
     const r = await fetch(API_URL + '?' + params.toString(), { method: 'GET', redirect: 'follow' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+}
+
+async function publicPost(payload) {
+    const r = await fetch(API_URL, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload), redirect: 'follow'
+    });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
 }
@@ -209,32 +220,111 @@ function showToast(msg, isError = false) {
 // AUTH MODAL (email + password)
 // ==============================================
 function showAuthModal(mode) {
+    mode = mode === 'register' ? 'register' : 'login';
     const modal = document.getElementById('authModal');
+    hideAccess();
     document.getElementById('authErr').textContent = '';
     document.getElementById('authPw1').value = '';
     document.getElementById('authPw2').value = '';
-
-    // Show email field always
     document.getElementById('emailWrap').style.display = 'block';
-
-    if (mode === 'register') {
-        document.getElementById('authSubtitle').textContent = 'Buat akun baru';
-        document.getElementById('pw2Wrap').style.display = 'block';
-        document.getElementById('authBtnText').textContent = 'Daftar';
-        document.getElementById('authNote').textContent = 'Spreadsheet baru akan dibuat di akun developer.';
-    } else {
-        document.getElementById('authSubtitle').textContent = 'Masuk ke akun kamu';
-        document.getElementById('pw2Wrap').style.display = 'none';
-        document.getElementById('authBtnText').textContent = 'Masuk';
-        document.getElementById('authNote').textContent = 'Dev default password: admin123';
-    }
+    const reg = mode === 'register';
+    document.getElementById('authSubtitle').textContent = reg ? 'Buat akun baru' : 'Masuk ke akun kamu';
+    document.getElementById('pw2Wrap').style.display = reg ? 'block' : 'none';
+    document.getElementById('authBtnText').textContent = reg ? 'Daftar' : 'Masuk';
+    document.getElementById('authNote').textContent = reg ? 'Gunakan email Google (Gmail). Akses perlu persetujuan developer.' : 'Belum punya akun? Pilih Daftar. Akses perlu persetujuan developer.';
+    document.getElementById('tabLogin').classList.toggle('on', !reg);
+    document.getElementById('tabReg').classList.toggle('on', reg);
     modal.classList.remove('hidden');
     modal.dataset.mode = mode;
-    setTimeout(() => document.getElementById('authEmail').focus(), 100);
+    initGoogleBtn(0);
 }
 function hideAuthModal() {
     document.getElementById('authModal').classList.add('hidden');
 }
+
+// ---- Login Google (Google Identity Services) ----
+function initGoogleBtn(tries) {
+    const wrap = document.getElementById('gWrap');
+    if (!GOOGLE_CLIENT_ID) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+    if (!(window.google && google.accounts && google.accounts.id)) {
+        if (tries < 20) setTimeout(() => initGoogleBtn(tries + 1), 400);
+        return;
+    }
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogleCred });
+    const box = document.getElementById('gBtn'); box.innerHTML = '';
+    google.accounts.id.renderButton(box, { theme: 'filled_black', size: 'large', shape: 'pill', width: 280,
+        text: document.getElementById('authModal').dataset.mode === 'register' ? 'signup_with' : 'signin_with' });
+}
+async function onGoogleCred(resp) {
+    const errEl = document.getElementById('authErr'); errEl.textContent = '';
+    showSaving('Masuk dengan Google...');
+    try {
+        const res = await publicPost({ action: 'googleAuth', idToken: resp.credential });
+        if (res.status !== 'success') { errEl.textContent = res.message || 'Gagal masuk dengan Google.'; return; }
+        afterLogin(res);
+    } catch (err) { errEl.textContent = 'Error: ' + err.message; }
+    finally { hideSaving(); }
+}
+
+// ---- Routing akses: Masuk -> Menunggu izin -> Hubungkan Drive -> pakai ----
+function afterLogin(res) {
+    saveSession(res.email, res.token, res.isDev);
+    hideAuthModal();
+    if (res.isDev) { hideAccess(); loadData(); refreshMe(); }
+    else routeAccess(res.accessStatus, res.hasSheet);
+}
+function routeAccess(st, hasSheet) {
+    if (st === 'Aktif' && hasSheet) { hideAccess(); hideAuthModal(); loadData(); return; }
+    showAccess(st === 'Aktif' ? 'nosheet' : st === 'Ditolak' ? 'rejected' : 'pending');
+}
+let accessState = '', accessTimer = null;
+function showAccess(state) {
+    accessState = state;
+    setLoading(false); hideAuthModal();
+    const m = {
+        pending:  { ico: '\u23F3', bg: '#3a2f0b', t: 'Menunggu persetujuan', x: 'Permintaan akses sudah dikirim ke developer. Halaman ini otomatis berubah saat disetujui.', pill: 'PENDING', pc: '#f5c542', pb: '#3a2f0b', btn: 'Cek status' },
+        rejected: { ico: '\u26D4', bg: '#2a1416', t: 'Akses ditolak', x: 'Developer belum memberi akses untuk email ini. Hubungi developer jika ini keliru.', pill: 'DITOLAK', pc: '#ff6b6b', pb: '#2a1416', btn: 'Cek status' },
+        nosheet:  { ico: '\u2713', bg: '#0e3a22', t: 'Akses disetujui', x: 'Langkah berikutnya: hubungkan Google Drive agar spreadsheet pribadimu dibuat otomatis. Fitur ini sedang disiapkan.', pill: 'AKTIF', pc: '#3ddc84', pb: '#0e3a22', btn: 'Hubungkan Google Drive (segera)' }
+    }[state];
+    document.getElementById('acIco').innerHTML = m.ico; document.getElementById('acIco').style.background = m.bg;
+    document.getElementById('acTitle').textContent = m.t; document.getElementById('acText').textContent = m.x;
+    document.getElementById('acWho').textContent = currentUser.email || '';
+    const pl = document.getElementById('acPill'); pl.textContent = m.pill; pl.style.color = m.pc; pl.style.background = m.pb;
+    const b = document.getElementById('acMain'); b.textContent = m.btn; b.disabled = state === 'nosheet';
+    document.getElementById('accessScreen').classList.remove('hidden');
+    clearInterval(accessTimer);
+    if (state !== 'nosheet') accessTimer = setInterval(() => { if (document.visibilityState === 'visible') checkAccessNow(true); }, 8000);
+}
+function hideAccess() { clearInterval(accessTimer); document.getElementById('accessScreen').classList.add('hidden'); }
+async function checkAccessNow(quiet) {
+    try {
+        const r = await apiGet('me');
+        if (r.code === 'AUTH') { try { localStorage.removeItem(AUTH_KEY); } catch (e) {} showAuthModal('login'); return; }
+        if (r.status !== 'success') return;
+        if (r.isDev) { saveSession(r.email, currentUser.token, true); hideAccess(); loadData(); return; }
+        if (r.accessStatus === 'Aktif' && r.hasSheet) { routeAccess('Aktif', true); return; }
+        const st = r.accessStatus === 'Aktif' ? 'nosheet' : r.accessStatus === 'Ditolak' ? 'rejected' : 'pending';
+        if (st !== accessState) showAccess(st);
+        else if (!quiet) showToast('Status: ' + r.accessStatus);
+    } catch (e) { if (!quiet) showToast('Koneksi error: ' + e.message, true); }
+}
+
+// ---- Developer: jumlah permintaan baru ----
+let pendingCount = 0;
+function setPending(n) {
+    pendingCount = n;
+    document.querySelectorAll('.mob-btn[data-page="setup"] .nbd').forEach(e => e.remove());
+    if (n > 0) document.querySelectorAll('.mob-btn[data-page="setup"]').forEach(b => b.insertAdjacentHTML('beforeend', '<span class="nbd">' + n + '</span>'));
+}
+async function refreshMe() {
+    if (!currentUser.isDev) return;
+    try {
+        const r = await apiGet('me');
+        if (r.status === 'success') { setPending(r.pendingCount || 0); if (sView === 'main') renderSettings(); }
+    } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshMe(); });
 
 async function doLogout() {
     if (!confirm('Keluar dari MyBudget?')) return;
@@ -282,6 +372,8 @@ async function initAuth() {
         return false;
     }
     currentUser = session;
+    if (!session.isDev) { setLoading(false); checkAccessNow(); return false; }
+    refreshMe();
     const cache = loadCache();
     if (cache && cache.email === session.email && cache.result) {
         applyData(cache.result);          // tampil langsung dari data terakhir
@@ -304,34 +396,19 @@ document.getElementById('authForm').addEventListener('submit', async function (e
     errEl.textContent = '';
 
     if (!email || email.indexOf('@') === -1) { errEl.textContent = 'Email tidak valid.'; return; }
-    if (pw1.length < 6) { errEl.textContent = 'Password minimal 6 karakter.'; return; }
-    if (mode === 'register' && pw1 !== pw2) { errEl.textContent = 'Konfirmasi password tidak cocok.'; return; }
+    if (pw1.length < (mode === 'register' ? 8 : 1)) { errEl.textContent = 'Kata sandi minimal 8 karakter.'; return; }
+    if (mode === 'register' && pw1 !== pw2) { errEl.textContent = 'Konfirmasi kata sandi tidak cocok.'; return; }
 
     btn.disabled = true;
     const origHTML = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>' +
-        (mode === 'register' ? 'Mendaftar...' : 'Masuk...') + '</span>';
-    showSaving(mode === 'register' ? 'Membuat spreadsheet...' : 'Masuk...');
-
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>' + (mode === 'register' ? 'Mendaftar...' : 'Masuk...') + '</span>';
     try {
-        const r = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: mode === 'register' ? 'register' : 'login', email, password: pw1 }),
-            redirect: 'follow'
-        });
-        const res = await r.json();
-        if (res.status !== 'success') {
-            errEl.textContent = res.message || 'Gagal.';
-            return;
-        }
-        saveSession(res.email, res.token, res.isDev);
-        hideAuthModal();
-        await loadData();
+        const res = await publicPost({ action: mode === 'register' ? 'register' : 'login', email, password: pw1 });
+        if (res.status !== 'success') { errEl.textContent = res.message || 'Gagal.'; return; }
+        afterLogin(res);
     } catch (err) {
         errEl.textContent = 'Error: ' + err.message;
     } finally {
-        hideSaving();
         btn.disabled = false;
         btn.innerHTML = origHTML;
     }
@@ -398,7 +475,10 @@ async function loadData(silent) {
         if (result.status === 'success') {
             applyData(result);
             saveCache();
-        } else if (/token|access denied/i.test(result.message || '')) {
+        } else if (result.code === 'PENDING' || result.code === 'REJECTED' || result.code === 'NO_SHEET') {
+            showAccess(result.code === 'PENDING' ? 'pending' : result.code === 'REJECTED' ? 'rejected' : 'nosheet');
+        } else if (result.code === 'AUTH' || /token|access denied/i.test(result.message || '')) {
+            try { localStorage.removeItem(AUTH_KEY); } catch (e) {}
             showAuthModal('login');
         } else {
             showToast('Gagal memuat: ' + result.message, true);
@@ -1424,12 +1504,65 @@ function curCats() {
 function renderSettings() {
     const el = document.getElementById('set'); if (!el) return;
     if (sView === 'cats') return renderCats(el);
+    if (sView === 'users') return renderUsers(el);
     const em = (currentUser && currentUser.email) || '', ini = (em.slice(0, 2) || 'MB').toUpperCase();
     const row = (bg, ic, t, v, on, red) => `<div class="sh-row" onclick="${on}"><span class="ic" style="background:${bg}"><i class="fa-solid ${ic}"></i></span><b style="${red ? 'color:#ff5a5f' : ''}">${t}</b>${v ? `<span class="sv">${v}</span>` : ''}${on && !red ? '<i class="fa-solid fa-chevron-right" style="color:#636366;font-size:13px"></i>' : ''}</div>`;
     el.innerHTML = `<h2 style="margin-top:16px">Settings</h2>
         <div class="sh-c"><div class="sh-row" style="cursor:default"><div class="av">${esc(ini)}</div><b style="font-size:15px;word-break:break-all">${esc(em || 'MyBudget')}<br><span class="sv" style="font-size:13px;font-weight:600">Personal account</span></b></div></div>
         <div class="sh-c" style="margin-top:14px">${row('#5b8def', 'fa-building-columns', 'Account Balance', 'Soon', '')}${row('#7b6fe8', 'fa-dollar-sign', 'Currency', 'IDR', '')}${row('#3fb99a', 'fa-tag', 'Categories', '', "sView='cats';renderSettings()")}</div>
+        ${currentUser.isDev ? `<div class="sh-c" style="margin-top:14px">${row('#b8860b', 'fa-user-shield', 'Pengguna &amp; Izin', pendingCount ? `<span class="bdg">${pendingCount} baru</span>` : '', "sView='users';openUsers()")}</div>` : ''}
         <div class="sh-c" style="margin-top:14px">${row('#4a8af4', 'fa-arrows-rotate', 'Refresh Data', '', 'refreshData()')}${row('#e5484d', 'fa-right-from-bracket', 'Logout', '', 'doLogout()', true)}</div>`;
+}
+
+// ==============================================
+// DEVELOPER: PENGGUNA & IZIN
+// ==============================================
+let uList = [], uTab = 'Pending', uBusy = false;
+async function openUsers() { renderSettings(); await loadUsers(); }
+async function loadUsers() {
+    uBusy = true; renderSettings();
+    try {
+        const r = await apiPost({ action: 'listUsers' });
+        if (r.status === 'success') { uList = r.users; setPending(uList.filter(u => u.status === 'Pending').length); }
+        else showToast('Gagal: ' + r.message, true);
+    } catch (e) { showToast('Koneksi error: ' + e.message, true); }
+    uBusy = false; renderSettings();
+}
+function renderUsers(el) {
+    const rb = 'style="background:var(--card)"', cnt = k => uList.filter(u => u.status === k).length;
+    const list = uList.map((u, i) => Object.assign({ i }, u)).filter(u => u.status === uTab);
+    const via = u => u.via === 'google' ? 'Via Google' : 'Via email';
+    const btns = (u, i) => uTab === 'Pending'
+        ? `<button class="ok" onclick="userSet(${i},'Aktif')">Setujui</button><button class="no" onclick="userSet(${i},'Ditolak')">Tolak</button>`
+        : uTab === 'Aktif'
+            ? `<button class="no" onclick="userSet(${i},'Ditolak')">Cabut akses</button><button onclick="userDel(${i})">Hapus</button>`
+            : `<button class="ok" onclick="userSet(${i},'Aktif')">Setujui ulang</button><button onclick="userDel(${i})">Hapus</button>`;
+    el.innerHTML = `<div class="hh" style="margin-top:6px"><button class="sh-r" ${rb} onclick="sView='main';renderSettings()"><i class="fa-solid fa-chevron-left"></i></button>
+        <button class="sh-r" ${rb} onclick="loadUsers()"><i class="fa-solid fa-arrows-rotate"></i></button></div>
+        <h2>Pengguna</h2>
+        <div class="tabs">${[['Pending', 'Pending'], ['Aktif', 'Aktif'], ['Ditolak', 'Ditolak']].map(t => `<button class="${uTab === t[0] ? 'on' : ''}" onclick="uTab='${t[0]}';renderSettings()">${t[1]} ${cnt(t[0])}</button>`).join('')}</div>
+        ${uBusy && !uList.length ? '<p class="hint">Memuat...</p>' : list.length ? list.map(u => `<div class="ucard"><b>${esc(u.email)}</b><em>${via(u)} · ${esc(uTab === 'Aktif' && u.approvedAt ? 'Disetujui ' + u.approvedAt : u.createdAt)}${u.hasSheet ? ' · Drive terhubung' : ''}</em><div class="ub">${btns(u, u.i)}</div></div>`).join('') : '<p class="hint">Tidak ada pengguna di tab ini.</p>'}
+        <p class="hint">Mencabut akses langsung mengeluarkan pengguna dari semua perangkat. Notifikasi permintaan baru dikirim ke email developer.</p>`;
+}
+async function userSet(i, st) {
+    const u = uList[i]; if (!u) return; const email = u.email;
+    if (st === 'Ditolak' && u.status === 'Aktif' && !confirm('Cabut akses ' + email + '?')) return;
+    const before = u.status; u.status = st; setPending(uList.filter(x => x.status === 'Pending').length); renderSettings();
+    try {
+        const r = await apiPost({ action: 'setUserStatus', target: email, newStatus: st });
+        if (r.status !== 'success') throw new Error(r.message);
+        showToast(st === 'Aktif' ? '\u2713 Disetujui' : '\u2713 Diperbarui');
+    } catch (e) { u.status = before; setPending(uList.filter(x => x.status === 'Pending').length); renderSettings(); showToast('Gagal: ' + e.message, true); }
+}
+async function userDel(i) {
+    const u0 = uList[i]; if (!u0) return; const email = u0.email;
+    if (!confirm('Hapus pengguna ' + email + '? Spreadsheet di Drive-nya tidak ikut terhapus.')) return;
+    const keep = uList.slice(); uList = uList.filter(x => x.email !== email); setPending(uList.filter(x => x.status === 'Pending').length); renderSettings();
+    try {
+        const r = await apiPost({ action: 'deleteUser', target: email });
+        if (r.status !== 'success') throw new Error(r.message);
+        showToast('\u2713 Pengguna dihapus');
+    } catch (e) { uList = keep; renderSettings(); showToast('Gagal: ' + e.message, true); }
 }
 function renderCats(el) {
     const list = cSort ? cDraft : curCats()[cTab], [y, m] = cMonth.split('-').map(Number);
