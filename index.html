@@ -445,6 +445,35 @@
         #page-dashboard > div:first-child > div:last-child { display:none !important; }
         #ovRec ~ * { display:none !important; }
         .bal .v small { display:block; margin-top:4px; }
+
+        /* Login: tab, Google, layar akses */
+        #authModal .atabs { display:flex; gap:6px; margin:0 0 16px; background:var(--card2); padding:4px; border-radius:14px; }
+        #authModal .atabs button { flex:1; border:none; background:transparent; color:#8e8e93; font-weight:700; font-size:13px; padding:9px; border-radius:11px; cursor:pointer; }
+        #authModal .atabs button.on { background:var(--blue); color:#fff; }
+        #authModal label { color:#8e8e93; }
+        #authModal .aor { display:flex; align-items:center; gap:10px; color:#636366; font-size:11px; margin:14px 0 12px; }
+        #authModal .aor:before, #authModal .aor:after { content:""; flex:1; height:1px; background:rgba(255,255,255,.1); }
+        #authModal .note { color:#8e8e93; }
+        #accessScreen { position:fixed; inset:0; background:#000; z-index:2100; display:flex; align-items:center; justify-content:center; padding:16px; }
+        #accessScreen.hidden { display:none; }
+        #accessScreen .card { background:var(--card); border-radius:28px; padding:28px 22px; width:100%; max-width:380px; text-align:center; }
+        #accessScreen h1 { color:#fff; font-size:22px; font-weight:800; margin:14px 0 6px; }
+        #accessScreen .sub { color:#8e8e93; font-size:13px; line-height:1.55; margin:0 0 14px; }
+        #accessScreen .aico { width:64px; height:64px; border-radius:20px; margin:0 auto; display:flex; align-items:center; justify-content:center; font-size:28px; background:#3a2f0b; }
+        #accessScreen .awho { color:#fff; font-weight:700; font-size:14px; word-break:break-all; margin-bottom:12px; }
+        #accessScreen .apill { display:inline-block; padding:4px 10px; border-radius:99px; font-size:11px; font-weight:800; margin-bottom:18px; }
+        #accessScreen .abtn { display:block; width:100%; border:none; border-radius:14px; padding:13px; font-weight:700; font-size:14px; background:var(--card2); color:#fff; margin-top:8px; cursor:pointer; }
+        #accessScreen .abtn.main { background:var(--blue); }
+        #accessScreen .abtn:disabled { opacity:.45; cursor:not-allowed; }
+        .bdg { background:#e5484d; color:#fff; border-radius:99px; font-size:11px; font-weight:800; padding:2px 8px; }
+        .nbd { position:absolute; top:0; right:calc(50% - 26px); background:#e5484d; color:#fff; border-radius:99px; font-size:10px; font-weight:800; padding:1px 6px; line-height:14px; }
+        .mob-btn { position:relative; }
+        .ucard { background:var(--card); border-radius:20px; padding:14px; margin-bottom:10px; }
+        .ucard b { color:#fff; font-size:15px; display:block; word-break:break-all; }
+        .ucard em { color:#8e8e93; font-style:normal; font-size:12px; }
+        .ucard .ub { display:flex; gap:8px; margin-top:10px; }
+        .ucard .ub button { flex:1; border:none; border-radius:12px; padding:10px; font-weight:700; font-size:13px; cursor:pointer; background:var(--card2); color:#fff; }
+        .ucard .ub .ok { background:var(--blue); } .ucard .ub .no { background:#2a1416; color:#ff6b6b; }
     </style>
 </head>
 <body>
@@ -459,16 +488,17 @@
         </div>
         <h1>MyBudget</h1>
         <p class="sub" id="authSubtitle">Masuk untuk lanjut</p>
+        <div class="atabs"><button type="button" id="tabLogin" onclick="showAuthModal('login')">Masuk</button><button type="button" id="tabReg" onclick="showAuthModal('register')">Daftar</button></div>
         <div id="emailWrap" style="display:none">
             <label>Email</label>
             <input type="email" id="authEmail" placeholder="email@gmail.com" required>
         </div>
         <form id="authForm" autocomplete="off">
-            <label id="lblPw1">Password</label>
-            <input type="password" id="authPw1" placeholder="Minimal 6 karakter" required minlength="6">
+            <label id="lblPw1">Kata sandi</label>
+            <input type="password" id="authPw1" placeholder="Minimal 8 karakter" required minlength="8">
             <div id="pw2Wrap" style="display:none">
-                <label>Konfirmasi Password</label>
-                <input type="password" id="authPw2" placeholder="Ulangi password" minlength="6">
+                <label>Ulangi kata sandi</label>
+                <input type="password" id="authPw2" placeholder="Ulangi kata sandi" minlength="8">
             </div>
             <p class="err" id="authErr"></p>
             <button type="submit" class="primary" id="authBtn">
@@ -476,7 +506,21 @@
                 <span id="authBtnText">Masuk</span>
             </button>
         </form>
-        <p class="note" id="authNote">Password kamu tersimpan di akun Google-mu sendiri.</p>
+        <div id="gWrap" style="display:none"><div class="aor">atau</div><div id="gBtn" style="display:flex;justify-content:center"></div></div>
+        <p class="note" id="authNote"></p>
+    </div>
+</div>
+
+<!-- ========== ACCESS SCREEN (menunggu izin / ditolak / hubungkan Drive) ========== -->
+<div id="accessScreen" class="hidden">
+    <div class="card">
+        <div class="aico" id="acIco">&#9203;</div>
+        <h1 id="acTitle"></h1>
+        <p class="sub" id="acText"></p>
+        <div class="awho" id="acWho"></div>
+        <span class="apill" id="acPill"></span>
+        <button type="button" class="abtn main" id="acMain" onclick="checkAccessNow()">Cek status</button>
+        <button type="button" class="abtn" onclick="doLogout()">Keluar</button>
     </div>
 </div>
 
@@ -873,6 +917,7 @@ window.addEventListener('resize', applyLayout);
 })();
 </script>
 
-<script src="script.js?v=20261001d"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="script.js?v=20261008a"></script>
 </body>
 </html>
