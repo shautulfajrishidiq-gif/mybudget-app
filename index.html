@@ -3,6 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" id="metaTheme" content="#000000">
+    <script>
+    (function () {
+        var t = 'dark';
+        try { t = localStorage.getItem('mb_theme') || 'dark'; } catch (e) {}
+        document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
+        window.getTheme = function () { return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; };
+        window.setTheme = function (v) {
+            v = v === 'light' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', v);
+            try { localStorage.setItem('mb_theme', v); } catch (e) {}
+            var m = document.getElementById('metaTheme'); if (m) m.setAttribute('content', v === 'light' ? '#f2f2f7' : '#000000');
+            if (document.body) document.body.classList.toggle('dark', v === 'dark');
+        };
+    })();
+    </script>
     <title>Ngatur Duit</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -509,6 +525,70 @@
         @keyframes spLine { from { stroke-dashoffset:620; opacity:0; } 15% { opacity:1; } to { stroke-dashoffset:0; opacity:1; } }
         @keyframes spUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
         @media (prefers-reduced-motion: reduce) { #splash.go .sp-b, #splash.go .sp-l, #splash.go h1, #splash.go p { animation:none; } }
+
+        /* ===== Tema: Dark (default) & Light ===== */
+        :root { color-scheme: dark; }
+        html[data-theme="light"] { color-scheme: light; --sidebar:#ffffff; --sidebar-hover:rgba(0,0,0,.05); --sidebar-active:rgba(47,109,240,.12); --card:#ffffff; --card2:#f2f2f7; --blue:#2f6df0; --muted:#6c6c70; }
+        html[data-theme="light"] body, html[data-theme="light"] body.dark { background:#f2f2f7 !important; color:#0f172a; }
+        html[data-theme="light"] .page h2 { color:#0f172a !important; }
+        html[data-theme="light"] body [style*="color:#0f172a"], html[data-theme="light"] body [style*="color:#1e293b"] { color:#0f172a !important; }
+        html[data-theme="light"] body [style*="background:white"], html[data-theme="light"] body [style*="background: white"], html[data-theme="light"] body [style*="background:#ffffff"], html[data-theme="light"] body [style*="background:#fff"] { background:#ffffff !important; }
+        html[data-theme="light"] body [style*="background:#f8fafc"], html[data-theme="light"] body [style*="background:#f1f5f9"] { background:#f2f2f7 !important; }
+        html[data-theme="light"] body [style*="border-bottom:1px solid"] { border-bottom-color:rgba(0,0,0,.08) !important; }
+        html[data-theme="light"] td, html[data-theme="light"] th { border-color:rgba(0,0,0,.08) !important; }
+        html[data-theme="light"] body input, html[data-theme="light"] body select, html[data-theme="light"] body textarea, html[data-theme="light"] body.dark input, html[data-theme="light"] body.dark select, html[data-theme="light"] body.dark textarea { color:#0f172a !important; }
+        html[data-theme="light"] .sh-row select, html[data-theme="light"] .sh-row input { color:#6c6c70 !important; background:transparent !important; }
+        html[data-theme="light"] #cName { color:#0f172a !important; }
+        html[data-theme="light"] #txNote { background:#f2f2f7 !important; }
+        html[data-theme="light"] #authModal input[type=password], html[data-theme="light"] #authModal input[type=email], html[data-theme="light"] #authModal input[type=text] { color:#0f172a !important; }
+        html[data-theme="light"] .stat-card, html[data-theme="light"] .stat-card .stat-value { color:#0f172a !important; }
+        html[data-theme="light"] .bal, html[data-theme="light"] .tc, html[data-theme="light"] .rt, html[data-theme="light"] .stat-card, html[data-theme="light"] .bstrip, html[data-theme="light"] .ucard, html[data-theme="light"] .tabs, html[data-theme="light"] .hp, html[data-theme="light"] .mp, html[data-theme="light"] #periodBtn { box-shadow:0 1px 2px rgba(0,0,0,.05); }
+        /* navigasi */
+        html[data-theme="light"] #mobile-nav { background:#ffffff !important; border-top-color:rgba(0,0,0,.1) !important; }
+        html[data-theme="light"] .mob-btn { color:#3c3c43; }
+        html[data-theme="light"] .mob-btn.active { background:#e8f0fe; color:var(--blue) !important; }
+        html[data-theme="light"] #sidebar-desktop { background:#ffffff; border-right-color:rgba(0,0,0,.08); }
+        html[data-theme="light"] #sidebar-desktop [style*="color:white"] { color:#0f172a !important; }
+        html[data-theme="light"] .nav-link { color:#64748b; }
+        html[data-theme="light"] .nav-link:hover { color:#0f172a; }
+        html[data-theme="light"] .nav-link.active { color:var(--blue); }
+        /* teks utama */
+        html[data-theme="light"] .ov-h, html[data-theme="light"] .mh, html[data-theme="light"] .bal .t, html[data-theme="light"] .bal .v, html[data-theme="light"] .bal .two b, html[data-theme="light"] .tc .n b, html[data-theme="light"] .rr .m b, html[data-theme="light"] .rr .a b, html[data-theme="light"] .sh-top .ti, html[data-theme="light"] .sh-row b, html[data-theme="light"] .ucard b, html[data-theme="light"] .tc small.sisa { color:#0f172a; }
+        html[data-theme="light"] .rr .a b[style*="color:#fff"] { color:#0f172a !important; }
+        html[data-theme="light"] .bar { background:#e5e5ea; }
+        html[data-theme="light"] .dsh { border-top-color:#d1d1d6; }
+        html[data-theme="light"] .dsh:before, html[data-theme="light"] .dsh:after { background:#f2f2f7; }
+        html[data-theme="light"] .rr, html[data-theme="light"] .sh-row { border-bottom-color:rgba(0,0,0,.08); }
+        html[data-theme="light"] .rr:last-child, html[data-theme="light"] .sh-row:last-child { border-bottom-color:transparent; }
+        /* sheet transaksi / budget / kategori */
+        html[data-theme="light"] .sh-p { background:#ffffff; }
+        html[data-theme="light"] .sh-c { background:#ffffff; }
+        html[data-theme="light"] .sh-p .sh-c { background:#f2f2f7; }
+        html[data-theme="light"] .sh-e { background:#f2f2f7; }
+        html[data-theme="light"] .txdel { background:#f2f2f7; }
+        html[data-theme="light"] #cPick span.em { background:#f2f2f7; }
+        html[data-theme="light"] .sh-r:not(.go) { background:#e5e5ea; }
+        html[data-theme="light"] .sh-r:not(.go):not(.x) { color:#0f172a; }
+        html[data-theme="light"] .sb { background:#e5e5ea; color:#0f172a; }
+        html[data-theme="light"] .seg { background:#f2f2f7; }
+        html[data-theme="light"] .sh-p .seg { background:#e5e5ea; }
+        html[data-theme="light"] .seg button { color:#0f172a; }
+        html[data-theme="light"] .seg button.on { background:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+        .seg button i { margin-right:6px; }
+        /* filter, tab, menu */
+        html[data-theme="light"] .hp button, html[data-theme="light"] .mp, html[data-theme="light"] .tabs button, html[data-theme="light"] #periodBtn, html[data-theme="light"] .pm-i { color:#0f172a; }
+        html[data-theme="light"] .tabs button.on { background:#e5e5ea; }
+        html[data-theme="light"] #periodMenu, html[data-theme="light"] .fm { background:rgba(255,255,255,.97); box-shadow:0 14px 40px rgba(0,0,0,.18); }
+        /* login & layar akses */
+        html[data-theme="light"] #authModal, html[data-theme="light"] #accessScreen { background:#f2f2f7; }
+        html[data-theme="light"] #authModal h1, html[data-theme="light"] #savingOverlay p, html[data-theme="light"] #accessScreen h1, html[data-theme="light"] #accessScreen .awho { color:#0f172a; }
+        html[data-theme="light"] #authModal [style*="color:#fff"] { color:#0f172a !important; }
+        html[data-theme="light"] #authModal .pwbox .eye { color:#6c6c70; }
+        html[data-theme="light"] #accessScreen .abtn { color:#0f172a; }
+        html[data-theme="light"] #accessScreen .abtn.main { color:#ffffff; }
+        html[data-theme="light"] .ucard .ub button { color:#0f172a; }
+        html[data-theme="light"] .ucard .ub .ok { color:#ffffff; }
+        html[data-theme="light"] .ucard .ub .no { background:#fdecec; color:#e5484d; }
     </style>
 </head>
 <body>
@@ -1017,6 +1097,7 @@ window.addEventListener('resize', applyLayout);
 </script>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>setTheme(getTheme());</script>
 <script>
 // Splash screen: tampil saat aplikasi dibuka dan setelah login
 (function () {
@@ -1040,6 +1121,6 @@ window.addEventListener('resize', applyLayout);
     t1 = setTimeout(hide, 1700);
 })();
 </script>
-<script src="script.js?v=20261105c"></script>
+<script src="script.js?v=20261105d"></script>
 </body>
 </html>
