@@ -1253,6 +1253,14 @@ warnaiJenis('Income');
         warmUp(true);
         const ok = await initAuth();
         if (ok) await loadData();
+        // Pintasan: buka ngaturduit-app.vercel.app/?new=1 langsung memunculkan form New Transaction
+        try {
+            const q = new URLSearchParams(location.search);
+            if (ok && (q.get('new') === '1' || location.hash === '#new')) {
+                history.replaceState(null, '', location.pathname);
+                openTx();
+            }
+        } catch (e) {}
     } catch (err) {
         setLoading(false);
         showToast('Error startup: ' + err.message, true);
