@@ -353,15 +353,14 @@ let accessState = '', accessTimer = null, curAccessKey = '', selPlan = 'Tahunan'
 
 // ---- Paket langganan (edit harga/pembayaran di sini) ----
 const PLAN_UI = [
-    { id: 'Bulanan', sub: 'Fleksibel, bayar tiap bulan', price: 'Rp 15.000', per: 'per bulan', badge: '' },
-    { id: 'Tahunan', sub: 'Setara Rp 8.250 per bulan', price: 'Rp 99.000', per: 'per tahun', badge: 'Paling hemat' },
-    { id: 'Sekali bayar', sub: 'Pro selamanya', price: 'Rp 249.000', per: 'sekali saja', badge: '' }
+    { id: 'Bulanan', sub: 'Fleksibel, bayar tiap bulan', price: 'Rp 15.000', per: 'per bulan', badge: '', qris: 'qris-bulanan.png' },
+    { id: 'Tahunan', sub: 'Setara Rp 8.250 per bulan', price: 'Rp 99.000', per: 'per tahun', badge: 'Paling hemat', qris: 'qris-tahunan.png' },
+    { id: 'Sekali bayar', sub: 'Pro selamanya', price: 'Rp 249.000', per: 'sekali saja', badge: '', qris: 'qris-sekali-bayar.png' }
 ];
 const PAY_CFG = {
-    qris: '',                                            // isi 'qris.png' jika kamu menaruh screenshot QR GoPay di repo; kosong = tidak ditampilkan
-    lines: [                                             // [judul, isi]
-        ['GoPay', '082286823353 a.n. Ngatur Duit App']
-    ],
+    // Gambar QRIS tiap paket ada di PLAN_UI (kolom qris). QR sudah berisi nominal paket, jadi pengguna tidak perlu mengetik.
+    // Ubah harga paket = QR-nya harus dibuat ulang dengan nominal baru.
+    lines: [],                                           // opsional: [judul, isi], contoh ['Transfer bank', 'BCA 123 a.n. Nama']
     wa: ''                                               // nomor WhatsApp admin format 62812xxxx (opsional, untuk tombol "Saya sudah bayar")
 };
 function planInfo(id) { return PLAN_UI.find(p => p.id === id); }
@@ -413,9 +412,11 @@ function renderPlan() {
     el.innerHTML = `<h1>Pembayaran</h1>
         <div class="pl-box"><div class="pl-row"><b>Ngatur Duit Pro · ${esc(p.id)}</b><b>${esc(p.price)}</b></div>
         <div class="pl-row sm"><span>Status</span><span class="pl-pill">Menunggu pembayaran</span></div></div>
-        ${PAY_CFG.qris ? `<div class="pl-qr"><img src="${esc(PAY_CFG.qris)}" alt="QRIS" onerror="this.parentNode.style.display='none'"><span>Scan dengan e-wallet atau m-banking apa pun</span></div>` : ''}
-        <div class="pl-box">${PAY_CFG.lines.map(l => `<div class="pl-line"><span>${esc(l[0])}</span><b>${esc(l[1])}</b></div>`).join('')}</div>
-        <p class="pl-sub" style="margin-top:12px">Tulis email akunmu <b>${esc(em)}</b> di catatan pembayaran supaya cepat dikenali. Akun aktif otomatis di layar ini setelah pembayaran dikonfirmasi.</p>
+        ${p.qris ? `<div class="pl-qr"><div class="pl-qrbox"><img src="${esc(p.qris)}" alt="QRIS ${esc(p.price)}" onerror="this.parentNode.parentNode.style.display='none'"></div>
+            <a class="pl-dl" href="${esc(p.qris)}" download="QRIS-Ngatur-Duit-${esc(p.id.replace(/ /g, '-'))}.png"><i class="fa-solid fa-download"></i> Download QRIS</a>
+            <span>Scan pakai GoPay, DANA, OVO, ShopeePay, atau m-banking. Nominal <b>${esc(p.price)}</b> sudah terisi otomatis. Tidak bisa scan? Download lalu buka dari galeri di aplikasi pembayaranmu.</span></div>` : ''}
+        ${PAY_CFG.lines.length ? `<div class="pl-box">${PAY_CFG.lines.map(l => `<div class="pl-line"><span>${esc(l[0])}</span><b>${esc(l[1])}</b></div>`).join('')}</div>` : ''}
+        <p class="pl-sub" style="margin-top:12px">Setelah membayar, tunggu pembayaranmu dikonfirmasi. Layar ini otomatis berubah dan aplikasi terbuka saat akunmu aktif. Akun: <b>${esc(em)}</b></p>
         ${wa ? `<a class="pl-cta" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box" href="${esc(wa)}" target="_blank" rel="noopener">Saya sudah bayar (WhatsApp)</a>` : ''}
         <button type="button" class="pl-cta ${wa ? 'ghost' : ''}" onclick="checkAccessNow()">Cek status</button>
         <button type="button" class="pl-link" onclick="showPlan('choose')">Ganti paket</button>
