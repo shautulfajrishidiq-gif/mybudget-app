@@ -1170,7 +1170,8 @@
   <div class="sh-l">Assignment</div>
   <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#4a8af4"><i class="fa-solid fa-tag"></i></span><b>Category</b><select id="bCat" onchange="document.getElementById('bEmoji').textContent=emojiFor(this.value,budJenis);wlBudSetup()"></select></label></div>
   <div id="bWalBox" style="display:none"><div class="sh-l">Wallet</div>
-  <div class="sh-c"><label class="sh-row"><span class="ic" id="bWalIc"></span><b id="bWalLbl">Dompet</b><select id="bWal" onchange="wlBudHint()"></select></label></div>
+  <div class="sh-c"><label class="sh-row"><span class="ic" id="bWalIc"></span><b id="bWalLbl">Dompet</b><select id="bWal" onchange="wlBudHint()"></select></label>
+  <label class="sh-row" id="bSrcRow" style="display:none"><span class="ic" id="bSrcIc"></span><b>Ambil dari</b><select id="bSrc" onchange="wlBudHint()"></select></label></div>
   <p class="hint" id="bWalHint"></p></div>
   <div id="bInterval"><div class="sh-l">Interval</div>
   <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#7b6fe8"><i class="fa-solid fa-rotate"></i></span><b>Repeat</b><select id="bRep"><option value="m">Monthly</option><option value="o">Once</option></select></label>

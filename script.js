@@ -1793,7 +1793,7 @@ function submitBud() {
         if (document.getElementById('bEndOn').checked && ed) { const d = parseTanggal(ed); ey = d.getFullYear(); em = d.getMonth() + 1; if (ey * 12 + em < y * 12 + m) { showToast('End Date sebelum bulan awal.', true); return; } }
         else { ey = y; em = 12; }
     }
-    wlBudSave(budJenis, kat);
+    wlBudSave(budJenis, kat, amt, bMonth);
     const keys = new Set(), add = [];
     for (let yy = y, mm = m; yy * 12 + mm <= ey * 12 + em && add.length < 60; mm++) { if (mm > 12) { mm = 1; yy++; } keys.add(yy + '-' + mm); add.push({ Jenis: budJenis, Kategori: kat, Bulan: mm, Tahun: yy, Budget: amt }); }
     const kept = dataBudget.filter(b => !(b.Jenis === budJenis && b.Kategori === kat && keys.has(Number(b.Tahun) + '-' + Number(b.Bulan))));
@@ -1802,6 +1802,7 @@ function submitBud() {
 function delBud() {
     if (!confirm('Hapus budget ini untuk bulan ini?')) return;
     const [y, m] = bMonth.split('-').map(Number);
+    wlBudDel(budJenis, budEdit, bMonth);
     saveBudgets(dataBudget.filter(b => !(b.Jenis === budJenis && b.Kategori === budEdit && Number(b.Bulan) === m && Number(b.Tahun) === y)), '\u2713 Budget dihapus!');
 }
 

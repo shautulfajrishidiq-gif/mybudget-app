@@ -35,11 +35,14 @@ function wlCatRaw() { return Object.keys(WL.cat).map(k => { const i = k.indexOf(
 function wlRenameCat(jn, old, nw) {
     const a = jn + '|' + old, b = jn + '|' + nw;
     if (WL.cat[a] !== undefined) { if (WL.cat[b] === undefined) WL.cat[b] = WL.cat[a]; delete WL.cat[a]; }
+    WL.trf.filter(t => String(t.Catatan || '').indexOf('[B]' + jn + '|' + old + '|') === 0).forEach(t => {
+        const ym = t.Catatan.split('|')[2]; wlTrfRemove(t); wlTrfAdd(t.Dari, t.Ke, t.Nominal, wlBTag(jn, nw, ym), t.Tanggal);
+    });
 }
 
 // ---------- saldo ----------
 function wlAfter(t, ts) { return !ts || !t.Timestamp || String(t.Timestamp) > ts; }
-function wlBal(w, exceptId) {
+function wlBal(w, exceptId, exceptTrf) {
     let b = Number(w.Saldo) || 0; const ts = w.SaldoTs || '';
     dataTransaksi.forEach(t => {
         if (!wlAfter(t, ts) || (exceptId && String(t.ID) === String(exceptId))) return;
@@ -49,12 +52,32 @@ function wlBal(w, exceptId) {
         else if (t.Jenis === 'Savings') { if (t.Dompet === w.ID) b -= n; if (t.KeDompet === w.ID) b += n; }
     });
     WL.trf.forEach(t => {
-        if (!wlAfter(t, ts)) return;
+        if (!wlAfter(t, ts) || (exceptTrf && t.ID === exceptTrf)) return;
         const n = Number(t.Nominal) || 0;
         if (t.Dari === w.ID) b -= n;
         if (t.Ke === w.ID) b += n;
     });
     return b;
+}
+// transfer otomatis dari budget: Catatan = [B]Jenis|Kategori|YYYY-MM
+function wlBTag(jn, kat, ym) { return '[B]' + jn + '|' + kat + '|' + ym; }
+function wlBTrf(jn, kat, ym) { const t = wlBTag(jn, kat, ym); return WL.trf.find(x => x.Catatan === t); }
+function wlTrfNote(t) { const c = String(t.Catatan || ''); return c.indexOf('[B]') === 0 ? 'Budget ' + c.slice(3).split('|')[1] : (c || 'Transfer'); }
+function wlTs() { const p2 = n => String(n).padStart(2, '0'), n = new Date(); return n.getFullYear() + '-' + p2(n.getMonth() + 1) + '-' + p2(n.getDate()) + ' ' + p2(n.getHours()) + ':' + p2(n.getMinutes()) + ':' + p2(n.getSeconds()); }
+function wlTrfAdd(dari, ke, nom, catatan, tgl) {
+    const row = { ID: newId().replace(/[^A-Za-z0-9_\-]/g, '').slice(0, 40), Tanggal: tgl || wlTs().slice(0, 10), Dari: dari, Ke: ke, Nominal: nom, Catatan: catatan, Timestamp: wlTs() };
+    WL.trf.push(row);
+    syncEnqueue({ run: retry => apiPost({ action: 'addTransfer', ID: row.ID, Tanggal: row.Tanggal, Dari: row.Dari, Ke: row.Ke, Nominal: row.Nominal, Catatan: row.Catatan, Retry: retry }) });
+}
+function wlTrfRemove(t) {
+    WL.trf = WL.trf.filter(x => x.ID !== t.ID);
+    syncEnqueue({ run: () => apiPost({ action: 'deleteTransfer', ID: t.ID }) });
+}
+function wlSrcLast() { try { return localStorage.getItem('mb_wl_src') || ''; } catch (e) { return ''; } }
+function wlSrcDefault(dest) {
+    const l = wlSrcLast(); if (l && l !== dest && wlGet(l)) return l;
+    const inc = dataTransaksi.filter(t => t.Jenis === 'Income' && t.Dompet && wlGet(t.Dompet) && t.Dompet !== dest).sort((a, b) => String(b.Timestamp).localeCompare(String(a.Timestamp)))[0];
+    return inc ? inc.Dompet : '';
 }
 function wlMY() { const n = new Date(); return [n.getMonth() + 1, n.getFullYear()]; }
 function wlBudgetsOf(w) {
@@ -161,7 +184,7 @@ function wlRenderDetail(el) {
     h += items.length ? '<div class="rt">' + items.slice(0, 40).map(x => {
         if (x.k === 'tx') return rowHtml(x.t);
         const t = x.t, out = t.Dari === w.ID, other = wlGet(out ? t.Ke : t.Dari), dt = parseTanggal(t.Tanggal).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        return `<div class="rr" onclick="wlDelTrf('${t.ID}')"><div class="e">\u{1F501}</div><div class="m"><b>Transfer ${out ? 'ke' : 'dari'} ${esc(other ? other.Nama : '?')}</b><em>${esc(t.Catatan || 'Transfer')}</em></div><div class="a"><b style="color:${out ? '#fff' : '#4a8af4'}">${out ? '-' : '+'}${idr(t.Nominal)}</b><em>${dt}</em></div></div>`;
+        return `<div class="rr" onclick="wlDelTrf('${t.ID}')"><div class="e">\u{1F501}</div><div class="m"><b>Transfer ${out ? 'ke' : 'dari'} ${esc(other ? other.Nama : '?')}</b><em>${esc(wlTrfNote(t))}</em></div><div class="a"><b style="color:${out ? '#fff' : '#4a8af4'}">${out ? '-' : '+'}${idr(t.Nominal)}</b><em>${dt}</em></div></div>`;
     }).join('') + '</div>' : '<div class="rt emp">Belum ada transaksi di dompet ini.</div>';
     el.innerHTML = h;
 }
@@ -228,29 +251,56 @@ function wlBudSetup() {
     const kat = document.getElementById('bCat').value, sel = WL.cat[budJenis + '|' + kat] || '';
     const pool = budJenis === 'Savings' ? WL.list : WL.list.filter(w => w.Tipe !== 'invest');
     document.getElementById('bWalLbl').textContent = budJenis === 'Savings' ? 'Disimpan di' : 'Dompet';
-    document.getElementById('bWal').innerHTML = '<option value="">Belum ditentukan</option>' + pool.map(w => `<option value="${w.ID}"${w.ID === sel ? ' selected' : ''}>${esc(w.Nama)} · ${idr(wlBal(w))}</option>`).join('');
+    document.getElementById('bWal').innerHTML = '<option value="">Belum ditentukan</option>' + pool.map(w => `<option value="${w.ID}"${w.ID === sel ? ' selected' : ''}>${esc(w.Nama)}</option>`).join('');
+    // sumber dana (hanya Expenses)
+    const ex = budJenis === 'Expenses' && kat ? wlBTrf('Expenses', kat, bMonth) : null;
+    const src = ex ? ex.Dari : (budEdit && !sel ? '' : wlSrcDefault(sel));
+    document.getElementById('bSrc').innerHTML = '<option value="">Tidak dipindah</option>' + WL.list.filter(w => w.Tipe !== 'invest').map(w => `<option value="${w.ID}"${w.ID === src ? ' selected' : ''}>${esc(w.Nama)} \u00b7 ${idr(wlBal(w, null, ex ? ex.ID : null))}</option>`).join('');
     wlBudHint();
 }
 function wlBudHint() {
     const el = document.getElementById('bWalHint'), sel = document.getElementById('bWal'); if (!el || !sel) return;
-    const w = wlGet(sel.value), ic = document.getElementById('bWalIc');
+    const w = wlGet(sel.value), ic = document.getElementById('bWalIc'), sr = document.getElementById('bSrcRow'), ss = document.getElementById('bSrc');
     if (ic) { ic.innerHTML = w ? wlAv(w, 40, true) : '<i class="fa-solid fa-wallet"></i>'; ic.style.background = w ? 'transparent' : '#e5484d'; }
+    const showSrc = !!w && budJenis === 'Expenses'; sr.style.display = showSrc ? 'flex' : 'none';
+    const s = showSrc ? wlGet(ss.value) : null, sic = document.getElementById('bSrcIc');
+    if (sic) { sic.innerHTML = s ? wlAv(s, 40, true) : '<i class="fa-solid fa-right-left"></i>'; sic.style.background = s ? 'transparent' : '#636366'; }
     if (!w) { el.textContent = ''; return; }
     if (budJenis === 'Savings') { el.textContent = 'Tabungan kategori ini masuk ke ' + w.Nama + '.'; el.style.color = ''; return; }
-    const kat = document.getElementById('bCat').value, amt = Number(document.getElementById('bAmt').value.replace(/\D/g, '')) || 0, [m, y] = wlMY();
+    const kat = document.getElementById('bCat').value, amt = Number(document.getElementById('bAmt').value.replace(/\D/g, '')) || 0;
+    const ex = kat ? wlBTrf('Expenses', kat, bMonth) : null;
+    if (s && s.ID !== w.ID) {
+        const after = wlBal(s, null, ex ? ex.ID : null) - amt;
+        el.style.color = after < 0 ? '#ffb454' : '';
+        el.textContent = (amt ? idr(amt) : 'Dana budget') + ' dipindah dari ' + s.Nama + ' ke ' + w.Nama + '. Saldo ' + s.Nama + (after < 0 ? ' jadi minus ' + idr(-after) + '.' : ' sisa ' + idr(after) + '.');
+        return;
+    }
+    const [y, m] = bMonth.split('-').map(Number);
     const used = Number(((getActualByCategory('Expenses', m, y) || {})[kat]) || 0), mine = Math.max(0, amt - used);
     const free = wlBal(w) - wlAlloc(w, kat) - mine;
     el.style.color = free < 0 ? '#ffb454' : '';
     el.textContent = free >= 0 ? 'Saldo ' + w.Nama + ' ' + idr(wlBal(w)) + '. Setelah dialokasikan, bebas ' + idr(free) + '.' : 'Saldo ' + w.Nama + ' kurang ' + idr(-free) + ' untuk semua budget di dompet ini.';
 }
-function wlBudSave(jn, kat) {
+function wlBudSave(jn, kat, amt, ym) {
     const box = document.getElementById('bWalBox'); if (!box || box.style.display === 'none') return;
     const val = document.getElementById('bWal').value, key = jn + '|' + kat;
-    if ((WL.cat[key] || '') === val) return;
-    if (val) WL.cat[key] = val; else delete WL.cat[key];
+    if ((WL.cat[key] || '') !== val) {
+        if (val) WL.cat[key] = val; else delete WL.cat[key];
+        syncEnqueue({ run: () => apiPost({ action: 'setCatWallet', Jenis: jn, Kategori: kat, Dompet: val }) });
+    }
+    if (jn === 'Expenses') {
+        const src = document.getElementById('bSrc').value;
+        const want = (src && val && src !== val && wlGet(src) && wlGet(val)) ? amt : 0, ex = wlBTrf(jn, kat, ym);
+        const same = ex && want && ex.Dari === src && ex.Ke === val && Number(ex.Nominal) === want;
+        if (!same) {
+            if (ex) wlTrfRemove(ex);
+            if (want) wlTrfAdd(src, val, want, wlBTag(jn, kat, ym));
+        }
+        if (src && want) { try { localStorage.setItem('mb_wl_src', src); } catch (e) {} }
+    }
     saveCache();
-    syncEnqueue({ run: () => apiPost({ action: 'setCatWallet', Jenis: jn, Kategori: kat, Dompet: val }) });
 }
+function wlBudDel(jn, kat, ym) { const ex = wlBTrf(jn, kat, ym); if (ex) { wlTrfRemove(ex); saveCache(); } }
 
 // ---------- sheet dompet ----------
 function wlShSet(html) { const sh = document.getElementById('wSheet'); document.getElementById('wBody').innerHTML = html; sh.classList.add('open'); }
@@ -270,9 +320,9 @@ function wlRenderWal() {
     let grid = '';
     if (s.type === 'bank' || s.type === 'ewallet') {
         const L = s.type === 'bank' ? WL_BANKS : WL_EWAL;
-        grid = `<div class="sh-l" style="font-size:13px;font-weight:700;color:#8e8e93;margin:14px 6px 8px">Pilih logo</div><div class="wl-grid">${L.map(x => `<button class="${s.pick === x[0] ? 'on' : ''}" onclick="wlWalPick('${x[0]}')" aria-label="${esc(x[1])}"><span><img alt="" src="logos/${x[0]}.svg"></span></button>`).join('')}<button class="${!s.pick ? 'on' : ''}" onclick="wlWalPick('')"><em>Lainnya</em></button></div>`;
+        grid = `<div class="sh-l" style="font-size:13px;font-weight:700;color:#8e8e93;margin:14px 6px 8px">Pilih logo</div><div class="wl-grid">${L.map(x => `<button data-k="${x[0]}" class="${s.pick === x[0] ? 'on' : ''}" onclick="wlWalPick('${x[0]}')" aria-label="${esc(x[1])}"><span><img alt="" src="logos/${x[0]}.svg"></span></button>`).join('')}<button data-k="" class="${!s.pick ? 'on' : ''}" onclick="wlWalPick('')"><em>Lainnya</em></button></div>`;
     } else if (s.type === 'invest') {
-        grid = `<div class="sh-l" style="font-size:13px;font-weight:700;color:#8e8e93;margin:14px 6px 8px">Jenis</div><div class="wl-grid">${WL_INVS.map(x => `<button class="${s.pick === x[0] ? 'on' : ''}" onclick="wlWalPick('${x[0]}')"><span class="ico" style="background:${x[2]}"><i class="fa-solid ${x[3]}"></i></span><em>${x[1]}</em></button>`).join('')}</div>`;
+        grid = `<div class="sh-l" style="font-size:13px;font-weight:700;color:#8e8e93;margin:14px 6px 8px">Jenis</div><div class="wl-grid">${WL_INVS.map(x => `<button data-k="${x[0]}" class="${s.pick === x[0] ? 'on' : ''}" onclick="wlWalPick('${x[0]}')"><span class="ico" style="background:${x[2]}"><i class="fa-solid ${x[3]}"></i></span><em>${x[1]}</em></button>`).join('')}</div>`;
     }
     const fields = `<div class="sh-c" style="margin-top:14px"><label class="sh-row"><b>Nama</b><input id="wlName" maxlength="40" placeholder="mis. BCA Utama" autocomplete="off" value="${esc(s.name)}" oninput="WS.name=this.value"></label>
         ${!edit ? `<label class="sh-row"><b>${s.type === 'invest' ? 'Nilai sekarang' : 'Saldo awal'}</b><input id="wlBal" inputmode="numeric" placeholder="0" autocomplete="off" value="${s.bal}" oninput="WS.bal=wlFmt(this)"></label>` : ''}
@@ -286,7 +336,10 @@ function wlWalPick(k) {
     WS.pick = k;
     const L = (WS.type === 'bank' ? WL_BANKS : WS.type === 'ewallet' ? WL_EWAL : WL_INVS).find(x => x[0] === k);
     if (L) { WS.name = L[1]; WS.color = L[2]; if (WS.type === 'invest') { WS.icon = L[3]; WS.sub = WS.sub || L[1]; } } else if (!k) { WS.color = ''; }
-    wlRenderWal();
+    // perbarui di tempat (tanpa render ulang) supaya logo tidak berkedip dan posisi scroll tetap
+    document.querySelectorAll('#wBody .wl-grid button').forEach(b => b.classList.toggle('on', b.dataset.k === k));
+    const n = document.getElementById('wlName'); if (n) n.value = WS.name;
+    const sb = document.getElementById('wlSub'); if (sb && WS.sub) sb.value = WS.sub;
 }
 function wlSaveWal() {
     const s = WS, name = (s.name || '').trim();
