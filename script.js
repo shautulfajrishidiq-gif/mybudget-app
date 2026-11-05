@@ -1277,13 +1277,85 @@ const EMOJI_GROUPS = [
 ];
 const EMOJIS = [...new Set(EMOJI_GROUPS.flatMap(g => g[1]))];
 function emojiPickerHtml(target) {
-    return EMOJI_GROUPS.map(g => `<div class="eg">${g[0]}</div><div class="ec">${[...new Set(g[1])].map(e => `<span class="em" onclick="document.getElementById('${target}').textContent='${e}';document.getElementById('cPick').classList.remove('open')">${e}</span>`).join('')}</div>`).join('');
+    return '<div class="ec" style="margin:2px 4px 2px"><span class="em" style="font-size:13px;font-weight:700;padding:9px 14px;border-radius:999px;color:var(--blue)" onclick="cEmojiAuto()">\u21BA Otomatis (sesuai nama)</span></div>' + EMOJI_GROUPS.map(g => `<div class="eg">${g[0]}</div><div class="ec">${[...new Set(g[1])].map(e => `<span class="em" onclick="cEmojiManual=true;document.getElementById('${target}').textContent='${e}';document.getElementById('cPick').classList.remove('open')">${e}</span>`).join('')}</div>`).join('');
 }
 const PERIODS = [['today','Today'],['week','This Week'],['month','This Month'],['all','All Time'],['custom','Custom']];
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 function idr(n) { return 'IDR ' + Math.round(n).toLocaleString('id-ID'); }
 function emojiMap() { try { return JSON.parse(localStorage.getItem('mb_emoji') || '{}'); } catch (e) { return {}; } }
-function emojiFor(k, jn) { return emojiMap()[k] || EMO[jn] || '\u{1F4B0}'; }
+let cEmojiManual = false; // true = emoji dipilih sendiri oleh pengguna (disimpan), false = otomatis dari nama
+// Pola nama kategori -> emoji (urutan penting: yang lebih spesifik di atas)
+const AUTO_EMOJI = [
+    [/\b(tempat tinggal|kost|kos|kontrakan|sewa|rumah|kpr|apartemen|properti)\b/, '\u{1F3E0}'],
+    [/\b(listrik|pln|token)\b/, '\u{1F4A1}'],
+    [/\b(air|pdam)\b/, '\u{1F4A7}'],
+    [/\b(gas|lpg)\b/, '\u{1F525}'],
+    [/\b(pulsa)\b/, '\u{1F4F1}'],
+    [/\b(internet|wifi|wi-fi|indihome|kuota|paket data)\b/, '\u{1F4F6}'],
+    [/(belanja bulanan|sembako|grocer|supermarket|pasar)/, '\u{1F6D2}'],
+    [/\b(kopi|coffee|cafe|kafe)\b/, '☕'],
+    [/(makan|minum|food|kuliner|resto|jajan|snack)/, '\u{1F37D}️'],
+    [/(belanja|shopping|fashion)/, '\u{1F6CD}️'],
+    [/\b(baju|pakaian|sepatu)\b/, '\u{1F455}'],
+    [/\b(bensin|bbm|pertamax|pertalite)\b/, '⛽'],
+    [/\b(mobil|car)\b/, '\u{1F697}'],
+    [/\b(kereta|krl|mrt|lrt|commuter)\b/, '\u{1F686}'],
+    [/(transport|ojek|ojol|grab|gojek|motor|parkir|tol\b|angkot|bus\b|kendaraan)/, '\u{1F6F5}'],
+    [/(kuliah|sekolah|\bspp\b|\bukt\b|pendidikan|kursus|\bles\b|buku|edukasi|tuition|education)/, '\u{1F393}'],
+    [/(zakat|infaq|infak|sedekah|amal)/, '\u{1F932}'],
+    [/(hadiah|donasi|gift|charity|kado)/, '\u{1F381}'],
+    [/(asuransi|bpjs|insurance)/, '\u{1F6E1}️'],
+    [/(utang|hutang|cicilan|pinjaman|kredit|paylater|pay later)/, '\u{1F4B3}'],
+    [/(pajak|\btax\b)/, '\u{1F9FE}'],
+    [/\b(kas|tunai|cash|dompet)\b/, '\u{1F4B5}'],
+    [/(admin|bank|rekening)/, '\u{1F3E6}'],
+    [/\b(ibu|mama|mamah|bunda)\b/, '\u{1F469}'],
+    [/\b(ayah|bapak|papa|abah)\b/, '\u{1F468}'],
+    [/(anak|bayi|baby|popok)/, '\u{1F476}'],
+    [/(istri|suami|pasangan|pacar)/, '❤️'],
+    [/(nikah|pernikahan|wedding)/, '\u{1F48D}'],
+    [/(orang tua|ortu|keluarga|family)/, '\u{1F468}‍\u{1F469}‍\u{1F467}'],
+    [/(kesehatan|obat|dokter|\brs\b|rumah sakit|klinik|medis|apotek|vitamin)/, '\u{1F48A}'],
+    [/(game|gaming)/, '\u{1F3AE}'],
+    [/(spotify|musik|music)/, '\u{1F3B5}'],
+    [/(hiburan|nonton|film|netflix|youtube|hobi|langganan|subscription)/, '\u{1F3AC}'],
+    [/(liburan|travel|wisata|jalan-jalan|tiket|hotel)/, '✈️'],
+    [/(olahraga|gym|fitness|futsal)/, '\u{1F3CB}️'],
+    [/(salon|skincare|kecantikan|barbershop|cukur|perawatan)/, '\u{1F484}'],
+    [/(laundry|cuci|kebersihan)/, '\u{1F9FC}'],
+    [/(hewan|kucing|anjing|\bpet\b)/, '\u{1F408}'],
+    [/(renovasi|perbaikan|servis|service|maintenance)/, '\u{1F527}'],
+    [/(\bhp\b|gadget|elektronik|laptop)/, '\u{1F4F1}'],
+    [/(ibadah|masjid|gereja|persepuluhan|tithe)/, '\u{1F54C}'],
+    [/(gaji|salary|upah)/, '\u{1F4BC}'],
+    [/(bonus|\bthr\b|insentif)/, '\u{1F389}'],
+    [/(freelance|proyek|project|jualan|dagang|penjualan|usaha|bisnis)/, '\u{1F3EA}'],
+    [/(dividen|investasi|saham|reksa|crypto|kripto)/, '\u{1F4C8}'],
+    [/\b(emas|gold)\b/, '\u{1FA99}'],
+    [/(dana darurat|darurat)/, '\u{1F6DF}'],
+    [/(tabungan|nabung|saving)/, '\u{1F437}'],
+    [/(deposito)/, '\u{1F3E6}'],
+    [/(haji|umroh|umrah|pensiun)/, '\u{1F54B}'],
+    [/(tagihan|\bbill\b)/, '\u{1F9FE}']
+];
+function autoEmoji(name, jn) {
+    const t = String(name || '').toLowerCase().trim();
+    if (t) for (let i = 0; i < AUTO_EMOJI.length; i++) if (AUTO_EMOJI[i][0].test(t)) return AUTO_EMOJI[i][1];
+    return EMO[jn] || '\u{1F4B0}';
+}
+// Pilihan manual pengguna menang; kalau belum ada, tebak dari nama kategori
+function emojiFor(k, jn) { return emojiMap()[k] || autoEmoji(k, jn); }
+// Sekali jalan: buang ikon default lama (keranjang dsb.) yang tersimpan otomatis, supaya diganti ikon sesuai nama
+(function () {
+    try {
+        if (localStorage.getItem('mb_emoji_mig')) return;
+        const m = emojiMap(), defs = Object.keys(EMO).map(k => EMO[k]);
+        let ch = false;
+        Object.keys(m).forEach(k => { if (defs.indexOf(m[k]) >= 0) { delete m[k]; ch = true; } });
+        if (ch) localStorage.setItem('mb_emoji', JSON.stringify(m));
+        localStorage.setItem('mb_emoji_mig', '1');
+    } catch (e) {}
+})();
 function ovRange() {
     const n = new Date(), t = new Date(n.getFullYear(), n.getMonth(), n.getDate());
     if (ovPeriod === 'today') return [t, t];
@@ -1689,15 +1761,22 @@ function openCat(i) {
     const name = cIdx >= 0 ? curCats()[cTab][cIdx] : '', inp = document.getElementById('cName');
     document.getElementById('cTitle').textContent = cIdx >= 0 ? 'Edit Category' : 'New Category';
     inp.value = name || ''; inp.readOnly = false;
-    document.getElementById('cHint').textContent = cIdx >= 0 ? 'Mengubah nama otomatis memperbarui transaksi dan budget bulan ini yang memakai kategori ini.' : '';
+    document.getElementById('cHint').textContent = (cIdx >= 0 ? 'Mengubah nama otomatis memperbarui transaksi dan budget yang memakai kategori ini. ' : '') + 'Emoji menyesuaikan nama secara otomatis. Ketuk emoji untuk menggantinya sendiri.';
     document.getElementById('cDel').style.display = cIdx >= 0 ? 'block' : 'none';
-    document.getElementById('cEmoji').textContent = cIdx >= 0 ? emojiFor(name, cTab) : EMO[cTab];
+    cEmojiManual = cIdx >= 0 && !!emojiMap()[name];
+    document.getElementById('cEmoji').textContent = cIdx >= 0 ? emojiFor(name, cTab) : autoEmoji('', cTab);
     document.getElementById('cPick').innerHTML = emojiPickerHtml('cEmoji');
     document.getElementById('cPick').scrollTop = 0;
     document.getElementById('cPick').classList.remove('open');
     document.getElementById('cSheet').classList.add('open');
 }
 function closeCat() { document.getElementById('cSheet').classList.remove('open'); }
+document.getElementById('cName').addEventListener('input', function () { if (!cEmojiManual) document.getElementById('cEmoji').textContent = autoEmoji(this.value, cTab); });
+function cEmojiAuto() {
+    cEmojiManual = false;
+    document.getElementById('cEmoji').textContent = autoEmoji(document.getElementById('cName').value, cTab);
+    document.getElementById('cPick').classList.remove('open');
+}
 function renameCat(old, nw, list) {
     if (list.some((k, i) => i !== cIdx && k.toLowerCase() === nw.toLowerCase())) { flagField('cName'); showToast('Nama sudah dipakai.', true); return; }
     const nTx = dataTransaksi.filter(t => t.Jenis === cTab && t.Kategori === old).length;
@@ -1714,7 +1793,7 @@ function renameCat(old, nw, list) {
     daftarKategori = aggregateKategori(kategoriByPeriod);
     dataTransaksi.forEach(t => { if (t.Jenis === jn && t.Kategori === old) t.Kategori = nw; });
     dataBudget.forEach(b => { if (b.Jenis === jn && b.Kategori === old) b.Kategori = nw; });
-    const em = emojiMap(); em[nw] = emoji;
+    const em = emojiMap(); if (cEmojiManual) em[nw] = emoji; else delete em[nw]; if (old !== nw) delete em[old];
     try { localStorage.setItem('mb_emoji', JSON.stringify(em)); } catch (e) {}
     saveCache(); closeCat(); renderSettings(); renderLocal(); refreshViews();
     syncEnqueue({ run: () => apiPost({ action: 'renameCategory', Jenis: jn, Old: old, New: nw, Bulan: m, Tahun: y, Income: v.Income, Expenses: v.Expenses, Savings: v.Savings }) });
@@ -1723,7 +1802,7 @@ function submitCat() {
     const name = document.getElementById('cName').value.trim(), list = curCats()[cTab];
     if (!name) { flagField('cName'); showToast('Isi nama kategori.', true); return; }
     if (cIdx >= 0 && name !== list[cIdx]) { renameCat(list[cIdx], name, list); return; }
-    const em = emojiMap(); em[name] = document.getElementById('cEmoji').textContent;
+    const em = emojiMap(); if (cEmojiManual) em[name] = document.getElementById('cEmoji').textContent; else delete em[name];
     if (cIdx >= 0) {
         try { localStorage.setItem('mb_emoji', JSON.stringify(em)); } catch (e) {}
         closeCat(); renderSettings(); refreshViews(); renderOverview(); return;
