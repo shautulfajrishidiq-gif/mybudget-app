@@ -336,7 +336,7 @@ function afterLogin(res) {
     hideAuthModal();
     loadProfileCache(); fetchProfile();
     if (res.isDev) { hideAccess(); loadData(); refreshMe(); }
-    else routeAccess(res.accessStatus);
+    else routeAccess(res.accessStatus, res);
 }
 async function routeAccess(st) {
     if (st === 'Aktif') {
@@ -347,16 +347,98 @@ async function routeAccess(st) {
         if (accessState === 'preparing') showAccess('retry'); // gagal memuat: beri tombol coba lagi
         return;
     }
-    showAccess(st === 'Ditolak' ? 'rejected' : 'pending');
+    accessFromInfo(Object.assign({ accessStatus: st }, info || {}));
 }
-let accessState = '', accessTimer = null;
+let accessState = '', accessTimer = null, curAccessKey = '', selPlan = 'Tahunan', planView = 'choose';
+
+// ---- Paket langganan (edit harga/pembayaran di sini) ----
+const PLAN_UI = [
+    { id: 'Bulanan', sub: 'Fleksibel, bayar tiap bulan', price: 'Rp 15.000', per: 'per bulan', badge: '' },
+    { id: 'Tahunan', sub: 'Setara Rp 8.250 per bulan', price: 'Rp 99.000', per: 'per tahun', badge: 'Paling hemat' },
+    { id: 'Sekali bayar', sub: 'Pro selamanya', price: 'Rp 249.000', per: 'sekali saja', badge: '' }
+];
+const PAY_CFG = {
+    qris: '',                                            // isi 'qris.png' jika kamu menaruh screenshot QR GoPay di repo; kosong = tidak ditampilkan
+    lines: [                                             // [judul, isi]
+        ['GoPay', '082286823353 a.n. Ngatur Duit App']
+    ],
+    wa: ''                                               // nomor WhatsApp admin format 62812xxxx (opsional, untuk tombol "Saya sudah bayar")
+};
+function planInfo(id) { return PLAN_UI.find(p => p.id === id); }
+function accessKeyOf(r) {
+    if (r.needPlan) return 'choose';
+    if (r.accessStatus === 'Kedaluwarsa') return 'expired';
+    if (r.accessStatus === 'Ditolak') return 'rejected';
+    if (planInfo(r.plan)) return 'pay:' + r.plan;
+    return 'pending';
+}
+function accessFromInfo(r, quiet) {
+    const k = accessKeyOf(r);
+    if (quiet && k === curAccessKey) return;
+    curAccessKey = k;
+    if (k === 'choose') return showPlan('choose');
+    if (k.indexOf('pay:') === 0) { selPlan = r.plan; return showPlan('pay'); }
+    showAccess(k);
+}
+function accessMain() { if (accessState === 'expired') showPlan('choose'); else checkAccessNow(); }
+function showPlan(view) {
+    planView = view; accessState = 'pending';
+    setLoading(false); hideAuthModal();
+    document.getElementById('accessScreen').classList.add('hidden');
+    renderPlan();
+    document.getElementById('planScreen').classList.remove('hidden');
+    clearInterval(accessTimer);
+    accessTimer = setInterval(() => { if (document.visibilityState === 'visible') checkAccessNow(true); }, 8000);
+}
+function pickPlan(id) { selPlan = id; renderPlan(); }
+function renderPlan() {
+    const el = document.getElementById('plBody'), em = (currentUser && currentUser.email) || '';
+    const chk = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>';
+    if (planView === 'choose') {
+        el.innerHTML = `<h1>Pilih paket Pro</h1>
+            <p class="pl-sub">Semua paket punya fitur yang sama. Akunmu diaktifkan setelah pembayaran dikonfirmasi.</p>
+            <div class="pl-list">${PLAN_UI.map(p => `<button type="button" class="pl-card ${selPlan === p.id ? 'on' : ''}" onclick="pickPlan('${p.id}')">
+                ${p.badge ? `<span class="pl-badge">${esc(p.badge)}</span>` : ''}
+                <span class="pl-radio">${selPlan === p.id ? chk : ''}</span>
+                <span class="pl-mid"><b>${esc(p.id)}</b><em>${esc(p.sub)}</em></span>
+                <span class="pl-pr"><b>${esc(p.price)}</b><em>${esc(p.per)}</em></span></button>`).join('')}</div>
+            <div class="pl-info"><i class="fa-solid fa-shield-halved"></i><span>Data keuanganmu tetap milikmu dan bisa di-export kapan saja.</span></div>
+            <button type="button" class="pl-cta" id="plGo" onclick="submitPlan()">Lanjut</button>
+            <button type="button" class="pl-link" onclick="doLogout()">Keluar</button>
+            <div class="pl-who">${esc(em)}</div>`;
+        return;
+    }
+    const p = planInfo(selPlan) || PLAN_UI[1];
+    const wa = PAY_CFG.wa ? 'https://wa.me/' + encodeURIComponent(PAY_CFG.wa) + '?text=' + encodeURIComponent('Halo, saya sudah bayar paket ' + p.id + ' untuk akun ' + em) : '';
+    el.innerHTML = `<h1>Pembayaran</h1>
+        <div class="pl-box"><div class="pl-row"><b>Ngatur Duit Pro · ${esc(p.id)}</b><b>${esc(p.price)}</b></div>
+        <div class="pl-row sm"><span>Status</span><span class="pl-pill">Menunggu pembayaran</span></div></div>
+        ${PAY_CFG.qris ? `<div class="pl-qr"><img src="${esc(PAY_CFG.qris)}" alt="QRIS" onerror="this.parentNode.style.display='none'"><span>Scan dengan e-wallet atau m-banking apa pun</span></div>` : ''}
+        <div class="pl-box">${PAY_CFG.lines.map(l => `<div class="pl-line"><span>${esc(l[0])}</span><b>${esc(l[1])}</b></div>`).join('')}</div>
+        <p class="pl-sub" style="margin-top:12px">Tulis email akunmu <b>${esc(em)}</b> di catatan pembayaran supaya cepat dikenali. Akun aktif otomatis di layar ini setelah pembayaran dikonfirmasi.</p>
+        ${wa ? `<a class="pl-cta" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box" href="${esc(wa)}" target="_blank" rel="noopener">Saya sudah bayar (WhatsApp)</a>` : ''}
+        <button type="button" class="pl-cta ${wa ? 'ghost' : ''}" onclick="checkAccessNow()">Cek status</button>
+        <button type="button" class="pl-link" onclick="showPlan('choose')">Ganti paket</button>
+        <button type="button" class="pl-link" onclick="doLogout()">Keluar</button>`;
+}
+async function submitPlan() {
+    btnBusy('plGo', true);
+    try {
+        const r = await apiPost({ action: 'choosePlan', plan: selPlan });
+        if (r.status !== 'success') throw new Error(r.message || 'Gagal');
+        curAccessKey = 'pay:' + selPlan; showPlan('pay');
+    } catch (e) { showToast(e.message || 'Gagal', true); }
+    finally { btnBusy('plGo', false); }
+}
 function showAccess(state) {
     accessState = state;
     setLoading(false); hideAuthModal();
+    document.getElementById('planScreen').classList.add('hidden');
     const m = {
         pending:  { ico: '\u23F3', bg: '#3a2f0b', t: 'Menunggu persetujuan', x: 'Permintaan akses sudah dikirim ke developer. Halaman ini otomatis berubah saat disetujui.', pill: 'PENDING', pc: '#f5c542', pb: '#3a2f0b', btn: 'Cek status' },
         rejected: { ico: '\u26D4', bg: '#2a1416', t: 'Akses ditolak', x: 'Developer belum memberi akses untuk email ini. Hubungi developer jika ini keliru.', pill: 'DITOLAK', pc: '#ff6b6b', pb: '#2a1416', btn: 'Cek status' },
         retry:    { ico: '!', bg: '#3a2f0b', t: 'Belum berhasil', x: 'Spreadsheet belum siap dimuat. Periksa koneksi lalu coba lagi.', pill: 'COBA LAGI', pc: '#f5c542', pb: '#3a2f0b', btn: 'Coba lagi' },
+        expired:  { ico: '\u231B', bg: '#3a2f0b', t: 'Langganan berakhir', x: 'Masa langgananmu sudah habis. Perpanjang untuk lanjut memakai Ngatur Duit. Datamu tetap aman.', pill: 'KEDALUWARSA', pc: '#f5c542', pb: '#3a2f0b', btn: 'Perpanjang' },
         preparing: { ico: '\u2713', bg: '#0e3a22', t: 'Akses disetujui', x: 'Menyiapkan spreadsheet pribadimu. Hanya sekali, sekitar 5 detik.', pill: 'MENYIAPKAN', pc: '#3ddc84', pb: '#0e3a22', btn: '' }
     }[state];
     document.getElementById('acIco').innerHTML = m.ico; document.getElementById('acIco').style.background = m.bg;
@@ -368,7 +450,7 @@ function showAccess(state) {
     clearInterval(accessTimer);
     if (state !== 'preparing' && state !== 'retry') accessTimer = setInterval(() => { if (document.visibilityState === 'visible') checkAccessNow(true); }, 8000);
 }
-function hideAccess() { clearInterval(accessTimer); document.getElementById('accessScreen').classList.add('hidden'); }
+function hideAccess() { clearInterval(accessTimer); curAccessKey = ''; document.getElementById('accessScreen').classList.add('hidden'); document.getElementById('planScreen').classList.add('hidden'); }
 async function checkAccessNow(quiet) {
     try {
         const r = await apiGet('me');
@@ -376,9 +458,8 @@ async function checkAccessNow(quiet) {
         if (r.status !== 'success') return;
         if (r.isDev) { saveSession(r.email, currentUser.token, true); hideAccess(); loadData(); return; }
         if (r.accessStatus === 'Aktif') { if (accessState !== 'preparing') routeAccess('Aktif'); return; }
-        const st = r.accessStatus === 'Ditolak' ? 'rejected' : 'pending';
-        if (st !== accessState) showAccess(st);
-        else if (!quiet) showToast('Status: ' + r.accessStatus);
+        accessFromInfo(r, quiet);
+        if (!quiet) showToast('Status: ' + (r.needPlan ? 'belum memilih paket' : r.accessStatus === 'Pending' ? 'menunggu pembayaran' : r.accessStatus));
     } catch (e) { if (!quiet) showToast('Koneksi error: ' + e.message, true); }
 }
 
@@ -561,8 +642,8 @@ async function loadData(silent) {
             if (accessState) { hideAccess(); accessState = ''; }
             applyData(result);
             saveCache();
-        } else if (result.code === 'PENDING' || result.code === 'REJECTED') {
-            showAccess(result.code === 'PENDING' ? 'pending' : 'rejected');
+        } else if (['PENDING', 'REJECTED', 'NEED_PLAN', 'EXPIRED'].indexOf(result.code) >= 0) {
+            checkAccessNow(true);
         } else if (result.code === 'AUTH' || /token|access denied/i.test(result.message || '')) {
             try { localStorage.removeItem(AUTH_KEY); } catch (e) {}
             showAuthModal('login');
@@ -1260,6 +1341,7 @@ warnaiJenis('Income');
                 history.replaceState(null, '', location.pathname);
                 openTx();
             }
+            else if (currentUser && currentUser.token && quickOn() && isStandalone()) openTx();
         } catch (e) {}
     } catch (err) {
         setLoading(false);
@@ -1683,13 +1765,30 @@ function renderSettings() {
     el.innerHTML = `<h2 style="margin-top:16px">Settings</h2>
         <div class="sh-c"><div class="sh-row" style="border-bottom:none" onclick="openProfile()"><div class="av">${avatarInner()}</div><b style="font-size:17px;min-width:0"><span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(profileTitle())}</span><span class="sv" style="display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(em)}</span></b><i class="fa-solid fa-chevron-right" style="color:#636366;font-size:13px"></i></div></div>
         ${lb('PREFERENSI')}
-        <div class="sh-c">${row('#3fb99a', 'fa-tag', 'Categories', '', "sView='cats';renderSettings()")}${row('#7b6fe8', 'fa-dollar-sign', 'Currency', 'IDR', '')}</div>
+        <div class="sh-c">${row('#3fb99a', 'fa-tag', 'Categories', '', "sView='cats';renderSettings()")}${row('#7b6fe8', 'fa-dollar-sign', 'Currency', 'IDR', '')}<label class="sh-row"><span class="ic" style="background:#f59e0b"><i class="fa-solid fa-bolt"></i></span><b>Langsung ke transaksi baru<br><span class="sv" style="font-size:12px;font-weight:600">Saat app dibuka dari layar utama</span></b><span class="tg"><input type="checkbox" ${quickOn() ? 'checked' : ''} onchange="setQuick(this.checked)"><i></i></span></label></div>
         ${themeCardHtml()}
         ${lb('DATA &amp; KEAMANAN')}
         <div class="sh-c">${row('#0ea5e9', 'fa-file-arrow-down', 'Export data (CSV)', '', 'exportCsv()')}${row('#64748b', 'fa-lock', 'Ganti kata sandi', '', 'openPw()')}${currentUser.isDev ? row('#b8860b', 'fa-user-shield', 'Pengguna &amp; Izin', pendingCount ? `<span class="bdg">${pendingCount} baru</span>` : '', "sView='users';openUsers()") : ''}</div>
         ${lb('AKUN')}
         <div class="sh-c">${row('#e5484d', 'fa-right-from-bracket', 'Keluar', '', 'doLogout()', true)}${currentUser.isDev ? '' : row('#e5484d', 'fa-user-xmark', 'Hapus akun &amp; data', '', 'doDeleteAccount()', true)}</div>`;
 }
+
+// ==============================================
+// MODE CEPAT: app di layar utama langsung membuka form New Transaction
+// ==============================================
+function isStandalone() { return !!(window.navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)); }
+function quickOn() { try { return localStorage.getItem('mb_quick') === '1'; } catch (e) { return false; } }
+function setQuick(on) { try { localStorage.setItem('mb_quick', on ? '1' : '0'); } catch (e) {} showToast(on ? 'Aktif: app langsung membuka transaksi baru' : 'Dimatikan'); }
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+    // kembali ke app dari background (mis. lewat ketuk belakang): buka form jika sudah >8 detik ditinggal
+    if (quickOn() && isStandalone() && hiddenAt && Date.now() - hiddenAt > 8000 && currentUser && currentUser.token) {
+        const sh = document.getElementById('txSheet');
+        if (sh && !sh.classList.contains('open')) openTx();
+    }
+    hiddenAt = 0;
+});
 
 // ==============================================
 // PROFIL (nama + foto), GANTI KATA SANDI, EXPORT CSV
@@ -1846,16 +1945,31 @@ function renderUsers(el) {
     const list = uList.map((u, i) => Object.assign({ i }, u)).filter(u => u.status === uTab);
     const via = u => u.via === 'google' ? 'Via Google' : 'Via email';
     const btns = (u, i) => uTab === 'Pending'
-        ? `<button class="ok" onclick="userSet(${i},'Aktif')">Setujui</button><button class="no" onclick="userSet(${i},'Ditolak')">Tolak</button>`
+        ? `<button class="ok" onclick="userSet(${i},'Aktif')">${u.plan && u.plan !== 'Belum pilih' ? 'Sudah bayar' : 'Setujui'}</button><button class="no" onclick="userSet(${i},'Ditolak')">Tolak</button>`
         : uTab === 'Aktif'
-            ? `${u.sheetUrl ? `<button class="ok" onclick="window.open('${esc(u.sheetUrl)}','_blank','noopener')">Buka sheet</button>` : ''}<button class="no" onclick="userSet(${i},'Ditolak')">Cabut</button><button onclick="userDel(${i})">Hapus</button>`
+            ? `${u.sheetUrl ? `<button class="ok" onclick="window.open('${esc(u.sheetUrl)}','_blank','noopener')">Buka sheet</button>` : ''}${u.plan === 'Bulanan' || u.plan === 'Tahunan' ? `<button class="ok" onclick="userRenew(${i})">Perpanjang</button>` : ''}<button class="no" onclick="userSet(${i},'Ditolak')">Cabut</button><button onclick="userDel(${i})">Hapus</button>`
             : `<button class="ok" onclick="userSet(${i},'Aktif')">Setujui ulang</button><button onclick="userDel(${i})">Hapus</button>`;
     el.innerHTML = `<div class="hh" style="margin-top:6px"><button class="sh-r" ${rb} onclick="sView='main';renderSettings()"><i class="fa-solid fa-chevron-left"></i></button>
         <button class="sh-r" ${rb} onclick="loadUsers()"><i class="fa-solid fa-arrows-rotate"></i></button></div>
         <h2>Pengguna</h2>
         <div class="tabs">${[['Pending', 'Pending'], ['Aktif', 'Aktif'], ['Ditolak', 'Ditolak']].map(t => `<button class="${uTab === t[0] ? 'on' : ''}" onclick="uTab='${t[0]}';renderSettings()">${t[1]} ${cnt(t[0])}</button>`).join('')}</div>
-        ${uBusy && !uList.length ? '<p class="hint">Memuat...</p>' : list.length ? list.map(u => `<div class="ucard"><b>${esc(u.email)}</b><em>${via(u)} · ${esc(uTab === 'Aktif' && u.approvedAt ? 'Disetujui ' + u.approvedAt : u.createdAt)}${u.hasSheet ? ' · Spreadsheet siap' : ''}</em><div class="ub">${btns(u, u.i)}</div></div>`).join('') : '<p class="hint">Tidak ada pengguna di tab ini.</p>'}
+        ${uBusy && !uList.length ? '<p class="hint">Memuat...</p>' : list.length ? list.map(u => `<div class="ucard"><b>${esc(u.email)}</b><em>${via(u)} · ${esc(uTab === 'Aktif' && u.approvedAt ? 'Disetujui ' + u.approvedAt : u.createdAt)}${u.hasSheet ? ' · Spreadsheet siap' : ''}${planMeta(u)}</em><div class="ub">${btns(u, u.i)}</div></div>`).join('') : '<p class="hint">Tidak ada pengguna di tab ini.</p>'}
         <p class="hint">Mencabut akses langsung mengeluarkan pengguna dari semua perangkat. Notifikasi permintaan baru dikirim ke email developer.</p>`;
+}
+function planMeta(u) {
+    if (!u.plan) return ' · Akun lama (gratis)';
+    if (u.plan === 'Belum pilih') return ' · Belum pilih paket';
+    const un = u.until === 'Selamanya' ? ' · selamanya' : u.until ? (u.expired ? ' · KEDALUWARSA ' : ' · s/d ') + esc(u.until) : '';
+    return ' · Paket ' + esc(u.plan) + un;
+}
+async function userRenew(i) {
+    const u = uList[i]; if (!u) return;
+    if (!confirm('Perpanjang paket ' + u.plan + ' untuk ' + u.email + '? Pastikan pembayarannya sudah masuk.')) return;
+    try {
+        const r = await apiPost({ action: 'setUserStatus', target: u.email, newStatus: 'Aktif', renew: true });
+        if (r.status !== 'success') throw new Error(r.message);
+        showToast('\u2713 Diperpanjang'); loadUsers();
+    } catch (e) { showToast('Gagal: ' + e.message, true); }
 }
 async function userSet(i, st) {
     const u = uList[i]; if (!u) return; const email = u.email;
@@ -1865,6 +1979,7 @@ async function userSet(i, st) {
         const r = await apiPost({ action: 'setUserStatus', target: email, newStatus: st });
         if (r.status !== 'success') throw new Error(r.message);
         showToast(st === 'Aktif' ? '\u2713 Disetujui' : '\u2713 Diperbarui');
+        if (st === 'Aktif') loadUsers();
     } catch (e) { u.status = before; setPending(uList.filter(x => x.status === 'Pending').length); renderSettings(); showToast('Gagal: ' + e.message, true); }
 }
 async function userDel(i) {

@@ -502,6 +502,46 @@
         #authModal a, #authModal .alink { color:var(--blue); font-weight:700; font-size:12px; cursor:pointer; text-decoration:none; }
         #authModal .fpok { width:56px; height:56px; border-radius:18px; background:#0e3a22; color:#3ddc84; display:flex; align-items:center; justify-content:center; margin:6px auto 0; font-size:24px; }
         #authModal .sub { color:#8e8e93; line-height:1.5; }
+        #planScreen { position:fixed; inset:0; background:#000; z-index:2100; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+        #planScreen.hidden { display:none; }
+        .pl-wrap { max-width:420px; margin:0 auto; padding:calc(48px + env(safe-area-inset-top)) 20px calc(32px + env(safe-area-inset-bottom)); }
+        .pl-wrap h1 { color:#fff; font-size:30px; line-height:1.15; font-weight:800; letter-spacing:-.5px; margin:0; }
+        .pl-sub { color:#a1a1a6; font-size:14px; line-height:1.5; margin:8px 0 0; }
+        .pl-sub b { color:#fff; word-break:break-all; }
+        .pl-list { display:flex; flex-direction:column; gap:12px; margin-top:22px; }
+        .pl-card { position:relative; display:flex; align-items:center; gap:14px; width:100%; text-align:left; background:#2c2c2e; border:2px solid transparent; border-radius:24px; padding:16px; font-family:inherit; cursor:pointer; }
+        .pl-card.on { border-color:var(--blue); }
+        .pl-badge { position:absolute; top:-11px; right:18px; background:var(--blue); color:#fff; font-size:11px; font-weight:800; border-radius:999px; padding:4px 10px; }
+        .pl-radio { width:24px; height:24px; border-radius:50%; border:2px solid #636366; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .pl-card.on .pl-radio { background:var(--blue); border-color:var(--blue); }
+        .pl-mid { flex:1; min-width:0; } .pl-pr { text-align:right; }
+        .pl-mid b, .pl-pr b { display:block; color:#fff; font-size:16px; font-weight:800; }
+        .pl-pr b { font-size:17px; }
+        .pl-mid em, .pl-pr em { display:block; font-style:normal; color:#a1a1a6; font-size:13px; margin-top:2px; }
+        .pl-info { display:flex; align-items:center; gap:10px; background:#1c1c1e; border-radius:16px; padding:12px 14px; margin-top:18px; color:#a1a1a6; font-size:13px; line-height:1.4; }
+        .pl-info i { color:#7fb0ff; font-size:18px; }
+        .pl-cta { display:block; width:100%; border:none; background:var(--blue); color:#fff; border-radius:999px; padding:17px 0; font-family:inherit; font-size:16px; font-weight:800; margin-top:22px; box-shadow:0 6px 20px rgba(74,138,244,.4); cursor:pointer; }
+        .pl-cta.ghost { background:#2c2c2e; box-shadow:none; margin-top:12px; font-size:15px; }
+        .pl-cta:disabled { opacity:.75; }
+        .pl-link { display:block; width:100%; border:none; background:none; color:#a1a1a6; font-family:inherit; font-size:14px; font-weight:700; padding:14px 0 0; cursor:pointer; }
+        .pl-who { text-align:center; color:#636366; font-size:12px; margin-top:10px; word-break:break-all; }
+        .pl-box { background:#2c2c2e; border-radius:24px; padding:6px 16px; margin-top:16px; }
+        .pl-row { display:flex; align-items:center; gap:10px; padding:12px 0; color:#fff; font-size:15px; }
+        .pl-row b { font-weight:700; } .pl-row b:first-child { flex:1; }
+        .pl-row.sm { border-top:1px solid rgba(255,255,255,.08); font-size:13px; color:#a1a1a6; justify-content:space-between; }
+        .pl-pill { color:#f5c542; background:#3a2f0b; font-size:11px; font-weight:800; border-radius:999px; padding:4px 10px; }
+        .pl-qr { text-align:center; margin-top:16px; }
+        .pl-qr img { width:220px; max-width:70%; background:#fff; border-radius:18px; padding:10px; display:block; margin:0 auto 8px; }
+        .pl-qr span { color:#a1a1a6; font-size:12px; }
+        .pl-line { padding:12px 0; border-bottom:1px solid rgba(255,255,255,.08); }
+        .pl-line:last-child { border-bottom:none; }
+        .pl-line span { display:block; color:#a1a1a6; font-size:12px; margin-bottom:3px; }
+        .pl-line b { color:#fff; font-size:14px; word-break:break-word; }
+        html[data-theme="light"] #planScreen { background:#f2f2f7; }
+        html[data-theme="light"] .pl-wrap h1, html[data-theme="light"] .pl-mid b, html[data-theme="light"] .pl-pr b, html[data-theme="light"] .pl-row, html[data-theme="light"] .pl-line b, html[data-theme="light"] .pl-sub b { color:#0f172a; }
+        html[data-theme="light"] .pl-card, html[data-theme="light"] .pl-box, html[data-theme="light"] .pl-info { background:#ffffff; }
+        html[data-theme="light"] .pl-cta.ghost { background:#e5e5ea; color:#0f172a; }
+        html[data-theme="light"] .pl-row.sm, html[data-theme="light"] .pl-line { border-color:rgba(0,0,0,.08); }
         #accessScreen { position:fixed; inset:0; background:#000; z-index:2100; display:flex; align-items:center; justify-content:center; padding:16px; }
         #accessScreen.hidden { display:none; }
         #accessScreen .card { background:var(--card); border-radius:28px; padding:28px 22px; width:100%; max-width:380px; text-align:center; }
@@ -717,10 +757,13 @@
         <p class="sub" id="acText"></p>
         <div class="awho" id="acWho"></div>
         <span class="apill" id="acPill"></span>
-        <button type="button" class="abtn main" id="acMain" onclick="checkAccessNow()">Cek status</button>
+        <button type="button" class="abtn main" id="acMain" onclick="accessMain()">Cek status</button>
         <button type="button" class="abtn" onclick="doLogout()">Keluar</button>
     </div>
 </div>
+
+<!-- ========== PILIH PAKET & PEMBAYARAN ========== -->
+<div id="planScreen" class="hidden"><div class="pl-wrap" id="plBody"></div></div>
 
 <!-- ========== SAVING OVERLAY ========== -->
 <div id="savingOverlay">
@@ -1148,7 +1191,7 @@ window.addEventListener('resize', applyLayout);
     t1 = setTimeout(hide, 1700);
 })();
 </script>
-<script src="script.js?v=20261105i"></script>
+<script src="script.js?v=20261105k"></script>
 <script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
