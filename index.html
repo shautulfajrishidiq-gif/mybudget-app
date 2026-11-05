@@ -662,6 +662,60 @@
         html[data-theme="light"] .ucard .ub button { color:#0f172a; }
         html[data-theme="light"] .ucard .ub .ok { color:#ffffff; }
         html[data-theme="light"] .ucard .ub .no { background:#fdecec; color:#e5484d; }
+    
+        /* ===== Dompet ===== */
+        :root { --wfg:#fff; }
+        html[data-theme="light"] { --wfg:#0f172a; }
+        .wl-av { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; color:#fff; overflow:hidden; }
+        .wl-av .lg { background:#fff; border-radius:28%; display:flex; align-items:center; justify-content:center; padding:2px; box-sizing:border-box; }
+        .wl-av .lg img { width:100%; height:100%; object-fit:contain; }
+        .wl-av b { font-weight:800; }
+        .wl-hs { display:flex; gap:10px; overflow-x:auto; padding:2px 2px 8px; scrollbar-width:none; }
+        .wl-hs::-webkit-scrollbar { display:none; }
+        .wl-card { flex:0 0 auto; min-width:168px; display:flex; align-items:center; gap:10px; text-align:left; background:var(--card); border:1px solid rgba(255,255,255,.05); border-radius:22px; padding:12px 14px; color:var(--wfg); font-family:inherit; }
+        .wl-card b { display:block; font-size:12px; color:var(--muted); font-weight:600; }
+        .wl-card strong { display:block; font-size:15px; font-weight:800; margin-top:1px; }
+        .wl-card em { display:block; font-style:normal; font-size:11px; color:var(--muted); margin-top:2px; }
+        em.warn, .wl-card em.warn { color:#ffb454 !important; }
+        .wl-cta { display:flex; align-items:center; gap:12px; background:var(--card); border-radius:22px; padding:14px 16px; color:var(--wfg); cursor:pointer; }
+        .wl-cta div { flex:1; min-width:0; } .wl-cta b { display:block; font-size:15px; } .wl-cta em { display:block; font-style:normal; font-size:12px; color:var(--muted); margin-top:2px; }
+        .wl-cta > i { color:#636366; font-size:13px; }
+        .wl-ic { width:42px; height:42px; border-radius:50%; background:#2563eb; color:#fff; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .wl-ic.big { width:64px; height:64px; font-size:26px; }
+        .wl-tag { display:flex; align-items:center; gap:6px; margin-top:8px; font-size:11px; color:var(--muted); }
+        .wl-tag span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .wl-tot { display:flex; align-items:center; justify-content:space-between; margin:10px 2px 4px; color:var(--muted); font-size:13px; }
+        .wl-tot b { color:var(--wfg); font-size:15px; margin-left:4px; }
+        .wl-pill { border:none; border-radius:999px; background:var(--card); color:var(--blue); font-weight:700; font-size:13px; padding:10px 16px; font-family:inherit; }
+        .wl-btn { border:none; border-radius:999px; background:var(--blue); color:#fff; font-weight:800; font-size:15px; padding:14px 22px; margin-top:14px; font-family:inherit; }
+        .wl-g { display:flex; justify-content:space-between; margin:16px 6px 8px; font-size:12px; font-weight:700; letter-spacing:.04em; color:#8e8e93; text-transform:uppercase; }
+        .wl-g b { color:var(--wfg); text-transform:none; letter-spacing:0; }
+        .wl-empty { text-align:center; padding:36px 10px 8px; color:var(--wfg); display:flex; flex-direction:column; align-items:center; }
+        .wl-empty p { color:var(--muted); font-size:13px; line-height:1.5; max-width:290px; margin:6px 0 0; }
+        .wl-hero { color:#fff; border-radius:28px; padding:18px; margin-top:8px; }
+        .wl-hero .top { display:flex; align-items:center; gap:12px; } .wl-hero em { display:block; font-style:normal; font-size:12px; opacity:.75; }
+        .wl-hero .top span { font-weight:800; font-size:17px; } .wl-hero strong { display:block; font-size:30px; font-weight:800; margin:14px 0 12px; }
+        .wl-hero .two { display:flex; gap:10px; } .wl-hero .two > div { flex:1; background:rgba(0,0,0,.25); border-radius:16px; padding:10px 12px; } .wl-hero .two b { font-size:14px; }
+        .wl-act { display:flex; gap:10px; margin-top:12px; } .wl-act .wl-pill { flex:1; }
+        .rr .m em.warn { color:#ffb454; }
+        #wSheet { position:fixed; inset:0; z-index:1600; background:rgba(0,0,0,.6); display:none; }
+        #wSheet.open { display:block; }
+        .wl-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+        .wl-grid button { border:2px solid transparent; border-radius:18px; background:#2c2c2e; padding:10px 4px; display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--wfg); font-family:inherit; min-height:64px; justify-content:center; }
+        .wl-grid button.on { border-color:var(--blue); }
+        .wl-grid button span { width:44px; height:44px; border-radius:12px; background:#fff; display:flex; align-items:center; justify-content:center; }
+        .wl-grid button span.ico { color:#fff; font-size:18px; }
+        .wl-grid button img { width:34px; height:34px; object-fit:contain; }
+        .wl-grid button em { font-style:normal; font-size:11px; font-weight:700; }
+        .wl-big { text-align:center; margin:24px 0 8px; } .wl-big em { display:block; font-style:normal; color:var(--muted); font-size:13px; }
+        .wl-big > div { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:6px; }
+        .wl-big span { color:#8e8e93; font-size:26px; font-weight:800; }
+        .wl-big input { background:transparent !important; border:none; outline:none; font-size:34px; font-weight:800; color:var(--wfg) !important; width:60%; min-width:0; padding:0 !important; }
+        #wSheet .sh-row select, #wSheet .sh-row input { max-width:60%; }
+        #wSheet .sh-row input[type=date] { max-width:none; }
+        html[data-theme="light"] .wl-card, html[data-theme="light"] .wl-cta, html[data-theme="light"] .wl-pill { background:#fff; border-color:rgba(0,0,0,.06); }
+        html[data-theme="light"] .wl-grid button { background:#f2f2f7; }
+        html[data-theme="light"] #wSheet .wl-big input { color:#0f172a !important; }
     </style>
 </head>
 <body>
@@ -871,6 +925,7 @@
             </div>
 
             <div id="ovBal"></div>
+            <div class="ov-h" id="ovWalH" style="display:none;display:none">Wallets <span style="float:right;font-size:13px;font-weight:600;color:var(--muted)"><span id="ovWalTot"></span> · <a onclick="openWallets()" style="color:var(--blue);cursor:pointer">See all</a></span></div><div id="ovWal"></div>
             <div class="ov-h">Top Categories</div><div id="ovTop"></div>
             <div class="ov-h">Recent Transactions</div><div id="ovRec"></div>
         </div>
@@ -1098,6 +1153,10 @@
     <div class="seg" id="txSeg"><button data-j="Expenses" onclick="setTxJenis('Expenses')">Expense</button><button data-j="Income" onclick="setTxJenis('Income')">Income</button><button data-j="Savings" onclick="setTxJenis('Savings')">Savings</button></div></div>
   <div class="sh-l">Assignment</div>
   <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#4a8af4"><i class="fa-solid fa-tag"></i></span><b>Category</b><select id="txCat" onchange="txCatChange()"></select></label></div>
+  <div id="txWalBox" style="display:none"><div class="sh-l">Wallet</div>
+  <div class="sh-c"><label class="sh-row"><span class="ic" id="txWalIc"></span><b id="txWalLbl">Pay from</b><select id="txWal" onchange="wlTxWalChange()"></select></label>
+  <label class="sh-row" id="txWal2Row" style="display:none"><span class="ic" id="txWal2Ic"></span><b>Save to</b><select id="txWal2" onchange="wlTxWalChange()"></select></label></div>
+  <p class="hint" id="txWalHint" style="display:none;color:#ffb454"></p></div>
   <div class="sh-l">Schedule</div>
   <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#5b8def"><i class="fa-solid fa-calendar"></i></span><b>Date</b><input type="date" id="txDate" onchange="fillTxCat()"></label></div>
   <textarea id="txNote" placeholder="Notes (optional)"></textarea>
@@ -1109,7 +1168,10 @@
   <div class="sh-c"><div class="sh-a"><span>IDR</span><input id="bAmt" inputmode="numeric" placeholder="0" autocomplete="off"></div>
     <div class="seg" id="bSeg"><button data-j="Expenses" onclick="setBudJenis('Expenses')">Expense</button><button data-j="Savings" onclick="setBudJenis('Savings')">Savings</button></div></div>
   <div class="sh-l">Assignment</div>
-  <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#4a8af4"><i class="fa-solid fa-tag"></i></span><b>Category</b><select id="bCat" onchange="document.getElementById('bEmoji').textContent=emojiFor(this.value,budJenis)"></select></label></div>
+  <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#4a8af4"><i class="fa-solid fa-tag"></i></span><b>Category</b><select id="bCat" onchange="document.getElementById('bEmoji').textContent=emojiFor(this.value,budJenis);wlBudSetup()"></select></label></div>
+  <div id="bWalBox" style="display:none"><div class="sh-l">Wallet</div>
+  <div class="sh-c"><label class="sh-row"><span class="ic" id="bWalIc"></span><b id="bWalLbl">Dompet</b><select id="bWal" onchange="wlBudHint()"></select></label></div>
+  <p class="hint" id="bWalHint"></p></div>
   <div id="bInterval"><div class="sh-l">Interval</div>
   <div class="sh-c"><label class="sh-row"><span class="ic" style="background:#7b6fe8"><i class="fa-solid fa-rotate"></i></span><b>Repeat</b><select id="bRep"><option value="m">Monthly</option><option value="o">Once</option></select></label>
   <label class="sh-row"><span class="ic" style="background:#7b6fe8"><i class="fa-solid fa-flag"></i></span><b>End Date</b><span class="tg"><input type="checkbox" id="bEndOn" onchange="document.getElementById('bEndRow').style.display=this.checked?'flex':'none'"><i></i></span></label>
@@ -1117,6 +1179,7 @@
   <p class="hint">Tanpa End Date, budget berlaku sampai Desember tahun ini.</p></div>
   <button class="txdel" id="bDel" onclick="delBud()">Delete Budget</button>
 </div></div>
+<div id="wSheet"><div class="sh-p" style="top:auto; max-height:90%"><div id="wBody"></div></div></div>
 <div id="pwSheet"><div class="sh-p" style="top:auto; max-height:88%">
   <div class="sh-top"><button class="sh-r x" onclick="closePw()"><i class="fa-solid fa-xmark"></i></button><div class="ti">Ganti Kata Sandi</div><button class="sh-r go" id="pwGo" onclick="submitPw()"><i class="fa-solid fa-check"></i></button></div>
   <div class="sh-c"><label class="sh-row"><b>Sandi lama</b><input id="pw0" type="password" autocomplete="current-password" placeholder="••••••••"></label>
@@ -1206,7 +1269,8 @@ window.addEventListener('resize', applyLayout);
     t1 = setTimeout(hide, 1700);
 })();
 </script>
-<script src="script.js?v=20261105p"></script>
+<script src="wallet.js?v=20261105w"></script>
+<script src="script.js?v=20261105w"></script>
 <script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });

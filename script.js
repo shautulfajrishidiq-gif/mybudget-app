@@ -576,7 +576,7 @@ function saveCache() {
     try {
         localStorage.setItem(CACHE_KEY, JSON.stringify({
             email: currentUser.email,
-            result: { status: 'success', data: dataTransaksi, kategoriByPeriod: kategoriByPeriod, kategori: daftarKategori, budget: dataBudget }
+            result: { status: 'success', data: dataTransaksi, kategoriByPeriod: kategoriByPeriod, kategori: daftarKategori, budget: dataBudget, dompet: WL.list, dompetKategori: wlCatRaw(), transfer: WL.trf }
         }));
     } catch (e) {}
 }
@@ -682,6 +682,7 @@ function applyData(result) {
         daftarKategori = result.kategori;
     }
     if (result.budget) dataBudget = result.budget;
+    wlLoad(result);
     renderAllData();
 }
 
@@ -1567,13 +1568,14 @@ function renderOverview() {
     const top = Object.entries(g).sort((a, b) => b[1] - a[1]).slice(0, 2);
     document.getElementById('ovTop').innerHTML = top.length ? '<div class="tcg">' + top.map(([k, v]) => {
         const b = bud.find(x => x.Kategori === k), bv = b ? Number(b.Budget) : 0;
-        return `<div class="tc"><div class="n"><span>${emojiFor(k, 'Expenses')}</span><div><em>${esc(k)}</em><b>${idr(v)}</b></div></div><div class="bar"><i style="width:${bv ? Math.min(100, v / bv * 100) : 0}%;background:#4a8af4"></i></div><small>${bv ? 'of ' + idr(bv) + ' budget' : 'No budget set'}</small></div>`;
+        return `<div class="tc"><div class="n"><span>${emojiFor(k, 'Expenses')}</span><div><em>${esc(k)}</em><b>${idr(v)}</b></div></div><div class="bar"><i style="width:${bv ? Math.min(100, v / bv * 100) : 0}%;background:#4a8af4"></i></div><small>${bv ? 'of ' + idr(bv) + ' budget' : 'No budget set'}</small>${wlBudTag('Expenses', k)}</div>`;
     }).join('') + '</div>' : '<div class="tc emp">No expenses this period</div>';
     const rec = per.slice().sort((a, b) => parseTanggal(b.Tanggal) - parseTanggal(a.Tanggal) || String(b.Timestamp).localeCompare(String(a.Timestamp))).slice(0, 5);
     document.getElementById('ovRec').innerHTML = rec.length ? '<div class="rt">' + rec.map(i => {
         const inc = i.Jenis === 'Income', dt = parseTanggal(i.Tanggal).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        return `<div class="rr" onclick="openTx('${i.ID}')"><div class="e">${emojiFor(i.Kategori, i.Jenis)}</div><div class="m"><b>${esc(i.Deskripsi || i.Kategori)}</b><em>${esc(i.Kategori)}</em></div><div class="a"><b style="color:${inc ? '#4a8af4' : '#fff'}">${inc ? '+' : '-'}${idr(i.Nominal)}</b>${sisaHtml(i)}<em>${dt}</em></div></div>`;
+        return `<div class="rr" onclick="openTx('${i.ID}')"><div class="e">${emojiFor(i.Kategori, i.Jenis)}</div><div class="m"><b>${esc(i.Deskripsi || i.Kategori)}</b><em>${esc(i.Kategori)}${wlTag(i)}</em></div><div class="a"><b style="color:${inc ? '#4a8af4' : '#fff'}">${inc ? '+' : '-'}${idr(i.Nominal)}</b>${sisaHtml(i)}<em>${dt}</em></div></div>`;
     }).join('') + '</div>' : '<div class="rt emp">Belum ada transaksi di periode ini</div>';
+    wlRenderOverview();
 }
 
 function openTxBase() {
@@ -1585,12 +1587,13 @@ function openTxBase() {
     document.getElementById('txSheet').classList.add('open');
 }
 function closeTx() { document.getElementById('txSheet').classList.remove('open'); }
-function txCatChange() { const v = document.getElementById('txCat').value; document.getElementById('txEmoji').textContent = v ? emojiFor(v, txJenis) : EMO[txJenis]; }
+function txCatChange() { const v = document.getElementById('txCat').value; document.getElementById('txEmoji').textContent = v ? emojiFor(v, txJenis) : EMO[txJenis]; wlTxCat(); }
 function setTxJenis(jn) {
     txJenis = jn;
     document.querySelectorAll('#txSeg button').forEach(b => b.classList.toggle('on', b.dataset.j === jn));
     document.getElementById('txEmoji').textContent = EMO[jn];
     fillTxCat();
+    wlTxSetup();
 }
 function fillTxCat() {
     const dv = document.getElementById('txDate').value; if (!dv) return;
@@ -1606,16 +1609,17 @@ function submitTx() {
         if (!tgl) flagField('txDate');
         showToast('Lengkapi nominal, kategori, dan tanggal.', true); return;
     }
+    const wv = wlTxVals(); if (wv.err) { showToast(wv.err, true); return; }
     const note = document.getElementById('txNote').value, jenis = txJenis, editId = txEditId;
     const p2 = v => String(v).padStart(2, '0'), n = new Date();
-    const row = { ID: editId || newId(), Tanggal: tgl, Jenis: jenis, Kategori: kat, Nominal: Number(nominal), Deskripsi: note,
+    const row = { ID: editId || newId(), Tanggal: tgl, Jenis: jenis, Kategori: kat, Nominal: Number(nominal), Deskripsi: note, Dompet: wv.d, KeDompet: wv.k,
         Timestamp: n.getFullYear() + '-' + p2(n.getMonth() + 1) + '-' + p2(n.getDate()) + ' ' + p2(n.getHours()) + ':' + p2(n.getMinutes()) + ':' + p2(n.getSeconds()) };
     const idx = editId ? dataTransaksi.findIndex(x => String(x.ID) === String(editId)) : -1;
     if (idx >= 0) { row.Timestamp = dataTransaksi[idx].Timestamp; dataTransaksi[idx] = row; } else dataTransaksi.push(row);
     closeTx(); renderLocal();
     const localId = row.ID;
     syncEnqueue({
-        run: retry => apiPost({ action: editId ? 'update' : 'insert', ID: resolveId(localId), Tanggal: tgl, Jenis: jenis, Kategori: kat, Nominal: nominal, Deskripsi: note, Retry: retry }),
+        run: retry => apiPost({ action: editId ? 'update' : 'insert', ID: resolveId(localId), Tanggal: tgl, Jenis: jenis, Kategori: kat, Nominal: nominal, Deskripsi: note, Dompet: wv.d, KeDompet: wv.k, Retry: retry }),
         onOk: res => {
             if (res.id && String(res.id) !== String(localId)) {
                 idMap[localId] = res.id;
@@ -1638,7 +1642,7 @@ function fabAction() { const p = document.querySelector('.page.active'); if (p &
 function ymd(t) { const d = parseTanggal(t), p = v => String(v).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
 function rowHtml(i) {
     const inc = i.Jenis === 'Income', dt = parseTanggal(i.Tanggal).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `<div class="rr" onclick="openTx('${i.ID}')"><div class="e">${emojiFor(i.Kategori, i.Jenis)}</div><div class="m"><b>${esc(i.Deskripsi || i.Kategori)}</b><em>${esc(i.Kategori)}</em></div><div class="a"><b style="color:${inc ? '#4a8af4' : '#fff'}">${inc ? '+' : '-'}${idr(i.Nominal)}</b>${sisaHtml(i)}<em>${dt}</em></div></div>`;
+    return `<div class="rr" onclick="openTx('${i.ID}')"><div class="e">${emojiFor(i.Kategori, i.Jenis)}</div><div class="m"><b>${esc(i.Deskripsi || i.Kategori)}</b><em>${esc(i.Kategori)}${wlTag(i)}</em></div><div class="a"><b style="color:${inc ? '#4a8af4' : '#fff'}">${inc ? '+' : '-'}${idr(i.Nominal)}</b>${sisaHtml(i)}<em>${dt}</em></div></div>`;
 }
 function renderHistory() {
     _sisaC = null;
@@ -1706,7 +1710,7 @@ function renderBudgets() {
             ${unalloc < 0 ? strip('Alokasi melebihi income', idrS(unalloc), true) : strip('Income belum teralokasikan', idr(unalloc))}
             <div class="g2" style="margin-top:10px">${items.map(b => { const a = Number(act[b.Kategori] || 0), bv = Number(b.Budget), p = Math.min(100, a / bv * 100), rem = bv - a;
                 const line = rem < 0 ? `<small class="sisa" style="color:${sv ? '#4a8af4' : '#ff5a5f'}">Lebih ${idr(-rem)}</small>` : `<small class="sisa">${sv ? 'Target sisa ' : 'Sisa '}${idr(rem)}</small>`;
-                return `<div class="tc bc" onclick="openBud('${esc(b.Kategori).replace(/'/g, "\\'")}')"><div class="n"><span>${emojiFor(b.Kategori, b.Jenis)}</span><div><em>${esc(b.Kategori)}</em><b>${idr(a)}</b></div></div><div class="bar"><i style="width:${p}%;background:${a > bv ? '#e5484d' : '#4a8af4'}"></i></div>${line}<small class="of">of ${idr(bv)} budget</small></div>`; }).join('')}</div>
+                return `<div class="tc bc" onclick="openBud('${esc(b.Kategori).replace(/'/g, "\\'")}')"><div class="n"><span>${emojiFor(b.Kategori, b.Jenis)}</span><div><em>${esc(b.Kategori)}</em><b>${idr(a)}</b></div></div><div class="bar"><i style="width:${p}%;background:${a > bv ? '#e5484d' : '#4a8af4'}"></i></div>${line}<small class="of">of ${idr(bv)} budget</small>${wlBudTag(b.Jenis, b.Kategori)}</div>`; }).join('')}</div>
             ${items.length ? '' : '<div class="emp">Belum ada budget bulan ini.<br>Tekan + untuk membuat.</div>'}`;
     }
     el.innerHTML = head + body;
@@ -1717,7 +1721,7 @@ function renderBudgets() {
 }
 
 function openTx(id) {
-    openTxBase(); txEditId = id || '';
+    openTxBase(); txEditId = id || ''; wlTxSetup();
     document.getElementById('txTitle').textContent = id ? 'Edit Transaction' : 'New Transaction';
     document.getElementById('txDel').style.display = id ? 'block' : 'none';
     if (!id) return;
@@ -1739,6 +1743,7 @@ function setBudJenis(jn) {
     const [y, m] = bMonth.split('-').map(Number), list = (kategoriForPeriod(m, y)[jn]) || [];
     document.getElementById('bCat').innerHTML = list.length ? '<option value="">Choose</option>' + list.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('') : '<option value="">Belum ada kategori</option>';
     document.getElementById('bEmoji').textContent = EMO[jn];
+    wlBudSetup();
 }
 function openBud(kat) {
     warmUp();
@@ -1755,6 +1760,7 @@ function openBud(kat) {
         c.value = kat; document.getElementById('bEmoji').textContent = emojiFor(kat, bJenisTab);
         document.getElementById('bAmt').value = b ? Number(b.Budget).toLocaleString('id-ID') : '';
     }
+    wlBudSetup();
     document.getElementById('bSheet').classList.add('open');
 }
 function closeBud() { document.getElementById('bSheet').classList.remove('open'); }
@@ -1787,6 +1793,7 @@ function submitBud() {
         if (document.getElementById('bEndOn').checked && ed) { const d = parseTanggal(ed); ey = d.getFullYear(); em = d.getMonth() + 1; if (ey * 12 + em < y * 12 + m) { showToast('End Date sebelum bulan awal.', true); return; } }
         else { ey = y; em = 12; }
     }
+    wlBudSave(budJenis, kat);
     const keys = new Set(), add = [];
     for (let yy = y, mm = m; yy * 12 + mm <= ey * 12 + em && add.length < 60; mm++) { if (mm > 12) { mm = 1; yy++; } keys.add(yy + '-' + mm); add.push({ Jenis: budJenis, Kategori: kat, Bulan: mm, Tahun: yy, Budget: amt }); }
     const kept = dataBudget.filter(b => !(b.Jenis === budJenis && b.Kategori === kat && keys.has(Number(b.Tahun) + '-' + Number(b.Bulan))));
@@ -1825,13 +1832,15 @@ function renderSettings() {
     if (sView === 'cats') return renderCats(el);
     if (sView === 'users') return renderUsers(el);
     if (sView === 'profile') return renderProfileEdit(el);
+    if (sView === 'wallets') return wlRenderList(el);
+    if (sView === 'wdetail') return wlRenderDetail(el);
     const em = (currentUser && currentUser.email) || '';
     const row = (bg, ic, t, v, on, red) => `<div class="sh-row" ${on ? `onclick="${on}"` : 'style="cursor:default"'}><span class="ic" style="background:${bg}"><i class="fa-solid ${ic}"></i></span><b style="${red ? 'color:#ff5a5f' : ''}">${t}</b>${v ? `<span class="sv">${v}</span>` : ''}${on && !red ? '<i class="fa-solid fa-chevron-right" style="color:#636366;font-size:13px"></i>' : ''}</div>`;
     const lb = t => `<div class="sh-l" style="font-size:12px;font-weight:700;letter-spacing:.04em;color:#8e8e93;margin:18px 6px 6px">${t}</div>`;
     el.innerHTML = `<h2 style="margin-top:16px">Settings</h2>
         <div class="sh-c"><div class="sh-row" style="border-bottom:none" onclick="openProfile()"><div class="av">${avatarInner()}</div><b style="font-size:17px;min-width:0"><span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(profileTitle())}</span><span class="sv" style="display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(em)}</span></b><i class="fa-solid fa-chevron-right" style="color:#636366;font-size:13px"></i></div></div>
         ${lb('PREFERENSI')}
-        <div class="sh-c">${row('#3fb99a', 'fa-tag', 'Categories', '', "sView='cats';renderSettings()")}${row('#7b6fe8', 'fa-dollar-sign', 'Currency', 'IDR', '')}<label class="sh-row"><span class="ic" style="background:#f59e0b"><i class="fa-solid fa-bolt"></i></span><b>Langsung ke transaksi baru<br><span class="sv" style="font-size:12px;font-weight:600">Saat app dibuka dari layar utama</span></b><span class="tg"><input type="checkbox" ${quickOn() ? 'checked' : ''} onchange="setQuick(this.checked)"><i></i></span></label></div>
+        <div class="sh-c">${row('#2563eb', 'fa-wallet', 'Wallets', WL.list.length ? String(WL.list.length) : '', 'openWallets()')}${row('#3fb99a', 'fa-tag', 'Categories', '', "sView='cats';renderSettings()")}${row('#7b6fe8', 'fa-dollar-sign', 'Currency', 'IDR', '')}<label class="sh-row"><span class="ic" style="background:#f59e0b"><i class="fa-solid fa-bolt"></i></span><b>Langsung ke transaksi baru<br><span class="sv" style="font-size:12px;font-weight:600">Saat app dibuka dari layar utama</span></b><span class="tg"><input type="checkbox" ${quickOn() ? 'checked' : ''} onchange="setQuick(this.checked)"><i></i></span></label></div>
         ${themeCardHtml()}
         ${subRowHtml(row)}
         ${lb('DATA &amp; KEAMANAN')}
@@ -2124,6 +2133,7 @@ function renameCat(old, nw, list) {
     daftarKategori = aggregateKategori(kategoriByPeriod);
     dataTransaksi.forEach(t => { if (t.Jenis === jn && t.Kategori === old) t.Kategori = nw; });
     dataBudget.forEach(b => { if (b.Jenis === jn && b.Kategori === old) b.Kategori = nw; });
+    wlRenameCat(jn, old, nw);
     const em = emojiMap(); if (cEmojiManual) em[nw] = emoji; else delete em[nw]; if (old !== nw) delete em[old];
     try { localStorage.setItem('mb_emoji', JSON.stringify(em)); } catch (e) {}
     saveCache(); closeCat(); renderSettings(); renderLocal(); refreshViews();
