@@ -454,6 +454,19 @@
         #authModal .aor { display:flex; align-items:center; gap:10px; color:#636366; font-size:11px; margin:14px 0 12px; }
         #authModal .aor:before, #authModal .aor:after { content:""; flex:1; height:1px; background:rgba(255,255,255,.1); }
         #authModal .note { color:#8e8e93; }
+        /* Kata sandi: mata, cocok/tidak, lupa sandi */
+        #authModal input[type=text], #authModal input[type=password], #authModal input[type=email] { width:100%; padding:10px 12px; font-size:13px; box-sizing:border-box; outline:none; margin-bottom:12px; }
+        #authModal input[type=text] { background:var(--card2) !important; color:#fff !important; border:none !important; border-radius:14px !important; }
+        #authModal #fpCode { letter-spacing:.4em; font-weight:800; font-size:18px; text-align:center; }
+        #authModal .pwbox { position:relative; }
+        #authModal .pwbox input { padding-right:44px; }
+        #authModal .pwbox .eye { position:absolute; right:4px; top:0; height:calc(100% - 12px); width:40px; border:none; background:transparent; color:#8e8e93; cursor:pointer; font-size:14px; }
+        #authModal .match { font-size:11px; margin:-6px 0 10px; min-height:14px; }
+        #authModal .match.ok { color:#3ddc84; } #authModal .match.no { color:#ff6b6b; }
+        #authModal .frow { text-align:right; margin:-4px 0 8px; }
+        #authModal a, #authModal .alink { color:var(--blue); font-weight:700; font-size:12px; cursor:pointer; text-decoration:none; }
+        #authModal .fpok { width:56px; height:56px; border-radius:18px; background:#0e3a22; color:#3ddc84; display:flex; align-items:center; justify-content:center; margin:6px auto 0; font-size:24px; }
+        #authModal .sub { color:#8e8e93; line-height:1.5; }
         #accessScreen { position:fixed; inset:0; background:#000; z-index:2100; display:flex; align-items:center; justify-content:center; padding:16px; }
         #accessScreen.hidden { display:none; }
         #accessScreen .card { background:var(--card); border-radius:28px; padding:28px 22px; width:100%; max-width:380px; text-align:center; }
@@ -487,27 +500,77 @@
             </div>
         </div>
         <h1>MyBudget</h1>
-        <p class="sub" id="authSubtitle">Masuk untuk lanjut</p>
-        <div class="atabs"><button type="button" id="tabLogin" onclick="showAuthModal('login')">Masuk</button><button type="button" id="tabReg" onclick="showAuthModal('register')">Daftar</button></div>
-        <div id="emailWrap" style="display:none">
-            <label>Email</label>
-            <input type="email" id="authEmail" placeholder="email@gmail.com" required>
+
+        <!-- Masuk / Daftar -->
+        <div id="authMain">
+            <p class="sub" id="authSubtitle">Masuk ke akun kamu</p>
+            <div class="atabs"><button type="button" id="tabLogin" onclick="showAuthModal('login')">Masuk</button><button type="button" id="tabReg" onclick="showAuthModal('register')">Daftar</button></div>
+            <form id="authForm" autocomplete="on">
+                <div id="emailWrap">
+                    <label>Email</label>
+                    <input type="email" id="authEmail" placeholder="email@gmail.com" autocomplete="username" required>
+                </div>
+                <label id="lblPw1">Kata sandi</label>
+                <div class="pwbox">
+                    <input type="password" id="authPw1" placeholder="Kata sandi" autocomplete="current-password" required>
+                    <button type="button" class="eye" onclick="togglePw('authPw1',this)" aria-label="Lihat kata sandi"><i class="fa-solid fa-eye"></i></button>
+                </div>
+                <div id="pw2Wrap" style="display:none">
+                    <label>Ulangi kata sandi</label>
+                    <div class="pwbox">
+                        <input type="password" id="authPw2" placeholder="Ulangi kata sandi" autocomplete="new-password">
+                        <button type="button" class="eye" onclick="togglePw('authPw2',this)" aria-label="Lihat kata sandi"><i class="fa-solid fa-eye"></i></button>
+                    </div>
+                    <p class="match" id="pwMatch"></p>
+                </div>
+                <div id="forgotRow" class="frow"><a onclick="showForgot()">Lupa kata sandi?</a></div>
+                <p class="err" id="authErr"></p>
+                <button type="submit" class="primary" id="authBtn">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    <span id="authBtnText">Masuk</span>
+                </button>
+            </form>
+            <div id="gWrap" style="display:none"><div class="aor">atau</div><div id="gBtn" style="display:flex;justify-content:center"></div></div>
+            <p class="note" id="authNote"></p>
         </div>
-        <form id="authForm" autocomplete="off">
-            <label id="lblPw1">Kata sandi</label>
-            <input type="password" id="authPw1" placeholder="Minimal 8 karakter" required minlength="8">
-            <div id="pw2Wrap" style="display:none">
-                <label>Ulangi kata sandi</label>
-                <input type="password" id="authPw2" placeholder="Ulangi kata sandi" minlength="8">
+
+        <!-- Lupa kata sandi: langkah 1 (email) -->
+        <div id="fp1" style="display:none">
+            <p class="sub">Masukkan email akunmu. Kami kirim kode 6 digit ke email itu.</p>
+            <label>Email</label>
+            <input type="email" id="fpEmail" placeholder="email@gmail.com" autocomplete="username">
+            <p class="err" id="fpErr1"></p>
+            <button type="button" class="primary" id="fpSendBtn" onclick="fpSend(false)"><span>Kirim kode</span></button>
+            <p class="note"><a class="alink" onclick="showAuthModal('login')">&larr; Kembali ke Masuk</a></p>
+        </div>
+
+        <!-- Lupa kata sandi: langkah 2 (kode + sandi baru) -->
+        <div id="fp2" style="display:none">
+            <p class="sub">Jika email terdaftar, kode 6 digit dikirim ke <b id="fpMail"></b>. Berlaku 15 menit.</p>
+            <label>Kode 6 digit</label>
+            <input type="text" id="fpCode" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">
+            <label>Kata sandi baru</label>
+            <div class="pwbox">
+                <input type="password" id="fpPw1" placeholder="Minimal 8 karakter" autocomplete="new-password">
+                <button type="button" class="eye" onclick="togglePw('fpPw1',this)" aria-label="Lihat kata sandi"><i class="fa-solid fa-eye"></i></button>
             </div>
-            <p class="err" id="authErr"></p>
-            <button type="submit" class="primary" id="authBtn">
-                <i class="fa-solid fa-right-to-bracket"></i>
-                <span id="authBtnText">Masuk</span>
-            </button>
-        </form>
-        <div id="gWrap" style="display:none"><div class="aor">atau</div><div id="gBtn" style="display:flex;justify-content:center"></div></div>
-        <p class="note" id="authNote"></p>
+            <label>Ulangi kata sandi baru</label>
+            <div class="pwbox">
+                <input type="password" id="fpPw2" placeholder="Ulangi kata sandi baru" autocomplete="new-password">
+                <button type="button" class="eye" onclick="togglePw('fpPw2',this)" aria-label="Lihat kata sandi"><i class="fa-solid fa-eye"></i></button>
+            </div>
+            <p class="match" id="fpMatch"></p>
+            <p class="err" id="fpErr2"></p>
+            <button type="button" class="primary" id="fpResetBtn" onclick="fpReset()"><span>Simpan kata sandi baru</span></button>
+            <p class="note"><a class="alink" onclick="fpSend(true)">Kirim ulang kode</a> &nbsp;·&nbsp; <a class="alink" onclick="showAuthModal('login')">Kembali ke Masuk</a></p>
+        </div>
+
+        <!-- Lupa kata sandi: berhasil -->
+        <div id="fp3" style="display:none;text-align:center">
+            <div class="fpok"><i class="fa-solid fa-check"></i></div>
+            <p class="sub" style="margin-top:12px"><b style="color:#fff;font-size:16px">Kata sandi diperbarui</b><br>Masuk dengan kata sandi baru. Perangkat lain otomatis keluar demi keamanan.</p>
+            <button type="button" class="primary" onclick="showAuthModal('login')"><span>Masuk</span></button>
+        </div>
     </div>
 </div>
 
@@ -918,6 +981,6 @@ window.addEventListener('resize', applyLayout);
 </script>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="script.js?v=20261008a"></script>
+<script src="script.js?v=20261105a"></script>
 </body>
 </html>
