@@ -389,9 +389,50 @@ function accessFromInfo(r, quiet) {
     if (k.indexOf('pay:') === 0) { selPlan = r.plan; return showPlan('pay'); }
     showAccess(k);
 }
+// ---- Langganan berjalan: banner pengingat, perpanjangan ----
+const GRACE_DAYS = 3, RENEW_DAYS = 7;        // harus sama dengan Code.gs
+let mySub = null, planRenew = false;
+function loadSubCache() {
+    try { const o = JSON.parse(localStorage.getItem('mb_sub') || 'null'); mySub = o && o.email === currentUser.email ? o.sub : null; } catch (e) { mySub = null; }
+}
+function saveSubCache() { try { localStorage.setItem('mb_sub', JSON.stringify({ email: currentUser.email, sub: mySub })); } catch (e) {} }
+function fmtTgl(s) {
+    const b = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'], p = String(s).split('-');
+    return p.length === 3 ? Number(p[2]) + ' ' + b[Number(p[1]) - 1] + ' ' + p[0] : String(s);
+}
+function addDaysYmd(s, n) { const d = new Date(Date.parse(s + 'T12:00:00') + n * 86400000); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+// null = tidak terkena batas waktu (akun lama / seumur hidup / developer)
+function subState() {
+    if (!mySub || !/^\d{4}-\d{2}-\d{2}$/.test(mySub.until || '') || (mySub.plan !== 'Bulanan' && mySub.plan !== 'Tahunan')) return null;
+    const left = Math.round((Date.parse(mySub.until + 'T12:00:00') - Date.parse(ymd(new Date()) + 'T12:00:00')) / 86400000);
+    return { left, state: left >= 0 ? 'aktif' : left >= -GRACE_DAYS ? 'tenggang' : 'habis', until: mySub.until, graceEnd: addDaysYmd(mySub.until, GRACE_DAYS) };
+}
+function renderSubBanner() {
+    const el = document.getElementById('subBanner'); if (!el) return;
+    const st = subState();
+    if (!st || currentUser.isDev) { el.style.display = 'none'; return; }
+    let cls = '', txt = '', btn = '';
+    if (mySub.renewPlan) { cls = 'info'; txt = 'Permintaan perpanjangan paket ' + esc(mySub.renewPlan) + ' sedang dikonfirmasi.'; }
+    else if (st.state === 'tenggang') { cls = 'red'; txt = 'Langgananmu sudah berakhir. Akses dihentikan ' + fmtTgl(st.graceEnd) + ' jika belum diperpanjang.'; btn = 'Perpanjang'; }
+    else if (st.state === 'aktif' && st.left <= 3) { cls = 'warn'; txt = st.left === 0 ? 'Langgananmu berakhir hari ini.' : 'Langgananmu berakhir ' + st.left + ' hari lagi (' + fmtTgl(st.until) + ').'; btn = 'Perpanjang'; }
+    if (!txt) { el.style.display = 'none'; return; }
+    el.className = 'sub-bar ' + cls; el.style.display = 'flex';
+    el.innerHTML = '<span>' + txt + '</span>' + (btn ? '<button type="button" onclick="openRenew()">' + btn + '</button>' : '');
+}
+function openRenew() {
+    const st = subState();
+    if (!st) { showToast(mySub && mySub.plan === 'Sekali bayar' ? 'Paketmu berlaku selamanya' : 'Akunmu tidak punya batas waktu'); return; }
+    if (mySub.renewPlan) { selPlan = mySub.renewPlan; return showPlan('pay', true); }
+    if (st.left > RENEW_DAYS) { showToast('Perpanjangan dibuka mulai ' + fmtTgl(addDaysYmd(st.until, -RENEW_DAYS))); return; }
+    selPlan = mySub.plan; showPlan('choose', true);
+}
+function closePlan() { planRenew = false; document.getElementById('planScreen').classList.add('hidden'); }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { renderSubBanner(); if (mySub && mySub.renewPlan) loadData(true); } });
 function accessMain() { if (accessState === 'expired') showPlan('choose'); else checkAccessNow(); }
-function showPlan(view) {
-    planView = view; accessState = 'pending';
+function showPlan(view, renew) {
+    planView = view; planRenew = !!renew;
+    if (planRenew) { renderPlan(); document.getElementById('planScreen').classList.remove('hidden'); return; }   // perpanjangan: app tetap bisa ditutup/dipakai
+    accessState = 'pending';
     setLoading(false); hideAuthModal();
     document.getElementById('accessScreen').classList.add('hidden');
     renderPlan();
@@ -404,8 +445,8 @@ function renderPlan() {
     const el = document.getElementById('plBody'), em = (currentUser && currentUser.email) || '';
     const chk = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>';
     if (planView === 'choose') {
-        el.innerHTML = `<h1>Pilih paket Pro</h1>
-            <p class="pl-sub">Semua paket punya fitur yang sama. Akunmu diaktifkan setelah pembayaran dikonfirmasi.</p>
+        el.innerHTML = `<h1>${planRenew ? 'Perpanjang langganan' : 'Pilih paket Pro'}</h1>
+            <p class="pl-sub">${planRenew ? 'Masa berlakumu disambung dari tanggal berakhir, jadi tidak ada hari yang hilang.' : 'Semua paket punya fitur yang sama. Akunmu diaktifkan setelah pembayaran dikonfirmasi.'}</p>
             <div class="pl-list">${PLAN_UI.map(p => `<button type="button" class="pl-card ${selPlan === p.id ? 'on' : ''}" onclick="pickPlan('${p.id}')">
                 ${p.badge ? `<span class="pl-badge">${esc(p.badge)}</span>` : ''}
                 <span class="pl-radio">${selPlan === p.id ? chk : ''}</span>
@@ -413,13 +454,13 @@ function renderPlan() {
                 <span class="pl-pr"><b>${esc(p.price)}</b><em>${esc(p.per)}</em></span></button>`).join('')}</div>
             <div class="pl-info"><i class="fa-solid fa-shield-halved"></i><span>Data keuanganmu tetap milikmu dan bisa di-export kapan saja.</span></div>
             <button type="button" class="pl-cta" id="plGo" onclick="submitPlan()">Lanjut</button>
-            <button type="button" class="pl-link" onclick="doLogout()">Keluar</button>
+            ${planRenew ? '<button type="button" class="pl-link" onclick="closePlan()">Nanti saja</button>' : '<button type="button" class="pl-link" onclick="doLogout()">Keluar</button>'}
             <div class="pl-who">${esc(em)}</div>`;
         return;
     }
     const p = planInfo(selPlan) || PLAN_UI[1];
     const wa = PAY_CFG.wa ? 'https://wa.me/' + encodeURIComponent(PAY_CFG.wa) + '?text=' + encodeURIComponent('Halo, saya sudah bayar paket ' + p.id + ' untuk akun ' + em) : '';
-    el.innerHTML = `<h1>Pembayaran</h1>
+    el.innerHTML = `<h1>${planRenew ? 'Pembayaran perpanjangan' : 'Pembayaran'}</h1>
         <div class="pl-box"><div class="pl-row"><b>Ngatur Duit Pro · ${esc(p.id)}</b><b>${esc(p.price)}</b></div>
         <div class="pl-row sm"><span>Status</span><span class="pl-pill">Menunggu pembayaran</span></div></div>
         ${p.qris ? `<div class="pl-qr"><div class="pl-qrbox"><img src="${esc(p.qris)}" alt="QRIS ${esc(p.price)}" onerror="this.parentNode.parentNode.style.display='none'"></div>
@@ -428,16 +469,20 @@ function renderPlan() {
         ${PAY_CFG.lines.length ? `<div class="pl-box">${PAY_CFG.lines.map(l => `<div class="pl-line"><span>${esc(l[0])}</span><b>${esc(l[1])}</b></div>`).join('')}</div>` : ''}
         <p class="pl-sub" style="margin-top:12px">Setelah membayar, tunggu pembayaranmu dikonfirmasi. Layar ini otomatis berubah dan aplikasi terbuka saat akunmu aktif. Akun: <b>${esc(em)}</b></p>
         ${wa ? `<a class="pl-cta" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box" href="${esc(wa)}" target="_blank" rel="noopener">Saya sudah bayar (WhatsApp)</a>` : ''}
-        <button type="button" class="pl-cta ${wa ? 'ghost' : ''}" onclick="checkAccessNow()">Cek status</button>
+        ${planRenew
+            ? `<button type="button" class="pl-cta ${wa ? 'ghost' : ''}" onclick="closePlan()">Kembali ke aplikasi</button>
+        <button type="button" class="pl-link" onclick="showPlan('choose', true)">Ganti paket</button>`
+            : `<button type="button" class="pl-cta ${wa ? 'ghost' : ''}" onclick="checkAccessNow()">Cek status</button>
         <button type="button" class="pl-link" onclick="showPlan('choose')">Ganti paket</button>
-        <button type="button" class="pl-link" onclick="doLogout()">Keluar</button>`;
+        <button type="button" class="pl-link" onclick="doLogout()">Keluar</button>`}`;
 }
 async function submitPlan() {
     btnBusy('plGo', true);
     try {
         const r = await apiPost({ action: 'choosePlan', plan: selPlan });
         if (r.status !== 'success') throw new Error(r.message || 'Gagal');
-        curAccessKey = 'pay:' + selPlan; showPlan('pay');
+        if (planRenew) { if (mySub) { mySub.renewPlan = selPlan; saveSubCache(); renderSubBanner(); } showPlan('pay', true); }
+        else { curAccessKey = 'pay:' + selPlan; showPlan('pay'); }
     } catch (e) { showToast(e.message || 'Gagal', true); }
     finally { btnBusy('plGo', false); }
 }
@@ -493,7 +538,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 async function doLogout() {
     if (!confirm('Keluar dari Ngatur Duit di perangkat ini?')) return;
     try { await Promise.race([apiPost({ action: 'logout' }), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
-    try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); localStorage.removeItem('mb_profile'); localStorage.removeItem('mb_access'); } catch (e) {}
+    try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); localStorage.removeItem('mb_profile'); localStorage.removeItem('mb_access'); localStorage.removeItem('mb_sub'); } catch (e) {}
     location.reload();
 }
 
@@ -505,7 +550,7 @@ async function doDeleteAccount() {
     try {
         const r = await apiPost({ action: 'deleteSelf' });
         if (r.status !== 'success') throw new Error(r.message || 'Gagal');
-        try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); localStorage.removeItem('mb_emoji'); localStorage.removeItem('mb_profile'); localStorage.removeItem('mb_access'); } catch (e) {}
+        try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); localStorage.removeItem('mb_emoji'); localStorage.removeItem('mb_profile'); localStorage.removeItem('mb_access'); localStorage.removeItem('mb_sub'); } catch (e) {}
         location.reload();
     } catch (e) { hideSaving(); showToast('Gagal: ' + e.message, true); }
 }
@@ -550,7 +595,7 @@ async function initAuth() {
         return false;
     }
     currentUser = session;
-    refreshMe(); loadProfileCache(); fetchProfile();
+    refreshMe(); loadProfileCache(); fetchProfile(); loadSubCache(); renderSubBanner();
     const cache = loadCache();
     if (cache && cache.email === session.email && cache.result) {
         applyData(cache.result);          // tampil langsung dari data terakhir
@@ -655,6 +700,7 @@ async function loadData(silent) {
             if (accessState) { hideAccess(); accessState = ''; }
             applyData(result);
             saveCache();
+            mySub = result.sub || null; saveSubCache(); renderSubBanner();
         } else if (['PENDING', 'REJECTED', 'NEED_PLAN', 'EXPIRED'].indexOf(result.code) >= 0) {
             if (result.accessStatus !== undefined) accessFromInfo(result, true);   // server baru: info sudah ikut di jawaban
             else await checkAccessNow(true);                                       // server lama: tanya status dulu
@@ -1768,6 +1814,12 @@ function themeCardHtml() {
     const b = (k, ic, l) => `<button class="${t === k ? 'on' : ''}" onclick="setTheme('${k}');renderSettings()"><i class="fa-solid ${ic}"></i>${l}</button>`;
     return `<div class="sh-c" style="margin-top:14px"><div class="sh-row" style="cursor:default;border-bottom:none;padding-bottom:0"><span class="ic" style="background:#5856d6"><i class="fa-solid fa-circle-half-stroke"></i></span><b>Appearance</b></div><div class="seg">${b('dark', 'fa-moon', 'Dark')}${b('light', 'fa-sun', 'Light')}</div></div>`;
 }
+function subRowHtml(row) {
+    if (currentUser.isDev || !mySub) return '';
+    const st = subState();
+    const v = esc(mySub.plan) + (st ? (st.state === 'tenggang' ? ' · tenggang' : ' · s/d ' + fmtTgl(st.until)) : (mySub.plan === 'Sekali bayar' ? ' · selamanya' : ''));
+    return `<div class="sh-l" style="font-size:12px;font-weight:700;letter-spacing:.04em;color:#8e8e93;margin:18px 6px 6px">LANGGANAN</div><div class="sh-c">${row('#16a34a', 'fa-crown', 'Langganan', v, 'openRenew()')}</div>`;
+}
 function renderSettings() {
     const el = document.getElementById('set'); if (!el) return;
     if (sView === 'cats') return renderCats(el);
@@ -1781,6 +1833,7 @@ function renderSettings() {
         ${lb('PREFERENSI')}
         <div class="sh-c">${row('#3fb99a', 'fa-tag', 'Categories', '', "sView='cats';renderSettings()")}${row('#7b6fe8', 'fa-dollar-sign', 'Currency', 'IDR', '')}<label class="sh-row"><span class="ic" style="background:#f59e0b"><i class="fa-solid fa-bolt"></i></span><b>Langsung ke transaksi baru<br><span class="sv" style="font-size:12px;font-weight:600">Saat app dibuka dari layar utama</span></b><span class="tg"><input type="checkbox" ${quickOn() ? 'checked' : ''} onchange="setQuick(this.checked)"><i></i></span></label></div>
         ${themeCardHtml()}
+        ${subRowHtml(row)}
         ${lb('DATA &amp; KEAMANAN')}
         <div class="sh-c">${row('#0ea5e9', 'fa-file-arrow-down', 'Export data (CSV)', '', 'exportCsv()')}${row('#64748b', 'fa-lock', 'Ganti kata sandi', '', 'openPw()')}${currentUser.isDev ? row('#b8860b', 'fa-user-shield', 'Pengguna &amp; Izin', pendingCount ? `<span class="bdg">${pendingCount} baru</span>` : '', "sView='users';openUsers()") : ''}</div>
         ${lb('AKUN')}
@@ -1961,7 +2014,7 @@ function renderUsers(el) {
     const btns = (u, i) => uTab === 'Pending'
         ? `<button class="ok" onclick="userSet(${i},'Aktif')">${u.plan && u.plan !== 'Belum pilih' ? 'Sudah bayar' : 'Setujui'}</button><button class="no" onclick="userSet(${i},'Ditolak')">Tolak</button>`
         : uTab === 'Aktif'
-            ? `${u.sheetUrl ? `<button class="ok" onclick="window.open('${esc(u.sheetUrl)}','_blank','noopener')">Buka sheet</button>` : ''}${u.plan === 'Bulanan' || u.plan === 'Tahunan' ? `<button class="ok" onclick="userRenew(${i})">Perpanjang</button>` : ''}<button class="no" onclick="userSet(${i},'Ditolak')">Cabut</button><button onclick="userDel(${i})">Hapus</button>`
+            ? `${u.sheetUrl ? `<button class="ok" onclick="window.open('${esc(u.sheetUrl)}','_blank','noopener')">Buka sheet</button>` : ''}${u.plan === 'Bulanan' || u.plan === 'Tahunan' || u.renewPlan ? `<button class="ok" onclick="userRenew(${i})">${u.renewPlan ? 'Perpanjang (' + esc(u.renewPlan) + ')' : 'Perpanjang'}</button>` : ''}<button class="no" onclick="userSet(${i},'Ditolak')">Cabut</button><button onclick="userDel(${i})">Hapus</button>`
             : `<button class="ok" onclick="userSet(${i},'Aktif')">Setujui ulang</button><button onclick="userDel(${i})">Hapus</button>`;
     el.innerHTML = `<div class="hh" style="margin-top:6px"><button class="sh-r" ${rb} onclick="sView='main';renderSettings()"><i class="fa-solid fa-chevron-left"></i></button>
         <button class="sh-r" ${rb} onclick="loadUsers()"><i class="fa-solid fa-arrows-rotate"></i></button></div>
@@ -1973,12 +2026,12 @@ function renderUsers(el) {
 function planMeta(u) {
     if (!u.plan) return ' · Akun lama (gratis)';
     if (u.plan === 'Belum pilih') return ' · Belum pilih paket';
-    const un = u.until === 'Selamanya' ? ' · selamanya' : u.until ? (u.expired ? ' · KEDALUWARSA ' : ' · s/d ') + esc(u.until) : '';
-    return ' · Paket ' + esc(u.plan) + un;
+    const un = u.until === 'Selamanya' ? ' · selamanya' : u.until ? (u.expired ? ' · KEDALUWARSA ' : u.state === 'tenggang' ? ' · MASA TENGGANG, berakhir ' : ' · s/d ') + esc(u.until) : '';
+    return ' · Paket ' + esc(u.plan) + un + (u.renewPlan ? ' · MINTA PERPANJANG ' + esc(u.renewPlan) : '');
 }
 async function userRenew(i) {
     const u = uList[i]; if (!u) return;
-    if (!confirm('Perpanjang paket ' + u.plan + ' untuk ' + u.email + '? Pastikan pembayarannya sudah masuk.')) return;
+    if (!confirm('Perpanjang paket ' + (u.renewPlan || u.plan) + ' untuk ' + u.email + '? Pastikan pembayarannya sudah masuk.')) return;
     try {
         const r = await apiPost({ action: 'setUserStatus', target: u.email, newStatus: 'Aktif', renew: true });
         if (r.status !== 'success') throw new Error(r.message);

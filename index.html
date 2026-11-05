@@ -502,6 +502,15 @@
         #authModal a, #authModal .alink { color:var(--blue); font-weight:700; font-size:12px; cursor:pointer; text-decoration:none; }
         #authModal .fpok { width:56px; height:56px; border-radius:18px; background:#0e3a22; color:#3ddc84; display:flex; align-items:center; justify-content:center; margin:6px auto 0; font-size:24px; }
         #authModal .sub { color:#8e8e93; line-height:1.5; }
+        .sub-bar { align-items:center; gap:10px; margin:10px 12px 0; padding:11px 14px; border-radius:16px; font-size:13px; font-weight:600; line-height:1.4; }
+        .sub-bar span { flex:1; }
+        .sub-bar button { border:none; border-radius:999px; padding:8px 14px; font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; flex-shrink:0; }
+        .sub-bar.warn { background:#3a2f0b; color:#f5c542; } .sub-bar.warn button { background:#f5c542; color:#1c1c1e; }
+        .sub-bar.red { background:#3a1517; color:#ff8a8f; } .sub-bar.red button { background:#ff5a5f; color:#fff; }
+        .sub-bar.info { background:#10263f; color:#7fb0ff; }
+        html[data-theme="light"] .sub-bar.warn { background:#fff4d6; color:#8a5a00; }
+        html[data-theme="light"] .sub-bar.red { background:#ffe3e4; color:#b42318; }
+        html[data-theme="light"] .sub-bar.info { background:#e3efff; color:#1d4ed8; }
         #planScreen { position:fixed; inset:0; background:#000; z-index:2100; overflow-y:auto; -webkit-overflow-scrolling:touch; }
         #planScreen.hidden { display:none; }
         .pl-wrap { max-width:420px; margin:0 auto; padding:calc(48px + env(safe-area-inset-top)) 20px calc(32px + env(safe-area-inset-bottom)); }
@@ -836,6 +845,7 @@
         </header>
 
         <!-- ============ PAGE: DASHBOARD ============ -->
+        <div id="subBanner" class="sub-bar" style="display:none"></div>
         <div id="page-dashboard" class="page active" style="padding:12px">
             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px">
                 <h2 style="font-size:16px; font-weight:700; color:#0f172a; margin:0; margin-right:auto">Overview</h2>
@@ -1196,7 +1206,7 @@ window.addEventListener('resize', applyLayout);
     t1 = setTimeout(hide, 1700);
 })();
 </script>
-<script src="script.js?v=20261105o"></script>
+<script src="script.js?v=20261105p"></script>
 <script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
