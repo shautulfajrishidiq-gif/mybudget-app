@@ -223,20 +223,82 @@ function showAuthModal(mode) {
     mode = mode === 'register' ? 'register' : 'login';
     const modal = document.getElementById('authModal');
     hideAccess();
+    ['fp1', 'fp2', 'fp3'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+    document.getElementById('authMain').style.display = 'block';
     document.getElementById('authErr').textContent = '';
-    document.getElementById('authPw1').value = '';
-    document.getElementById('authPw2').value = '';
-    document.getElementById('emailWrap').style.display = 'block';
+    ['authPw1', 'authPw2'].forEach(id => { const el = document.getElementById(id); el.value = ''; el.type = 'password'; });
+    document.querySelectorAll('#authModal .eye i').forEach(i => { i.className = 'fa-solid fa-eye'; });
+    document.getElementById('pwMatch').textContent = '';
     const reg = mode === 'register';
     document.getElementById('authSubtitle').textContent = reg ? 'Buat akun baru' : 'Masuk ke akun kamu';
     document.getElementById('pw2Wrap').style.display = reg ? 'block' : 'none';
+    document.getElementById('forgotRow').style.display = reg ? 'none' : 'block';
+    document.getElementById('authPw1').autocomplete = reg ? 'new-password' : 'current-password';
+    document.getElementById('authPw1').placeholder = reg ? 'Minimal 8 karakter' : 'Kata sandi';
     document.getElementById('authBtnText').textContent = reg ? 'Daftar' : 'Masuk';
-    document.getElementById('authNote').textContent = reg ? 'Gunakan email Google (Gmail). Akses perlu persetujuan developer.' : 'Belum punya akun? Pilih Daftar. Akses perlu persetujuan developer.';
+    document.getElementById('authNote').textContent = reg ? 'Akses perlu persetujuan developer.' : 'Setelah masuk, kamu tetap masuk di perangkat ini sampai menekan Keluar di Settings.';
     document.getElementById('tabLogin').classList.toggle('on', !reg);
     document.getElementById('tabReg').classList.toggle('on', reg);
     modal.classList.remove('hidden');
     modal.dataset.mode = mode;
     initGoogleBtn(0);
+}
+function togglePw(id, btn) {
+    const el = document.getElementById(id); if (!el) return;
+    const show = el.type === 'password';
+    el.type = show ? 'text' : 'password';
+    const i = btn.querySelector('i'); if (i) i.className = 'fa-solid ' + (show ? 'fa-eye-slash' : 'fa-eye');
+}
+function bindMatch(a, b, out) {
+    const f = () => {
+        const x = document.getElementById(a).value, y = document.getElementById(b).value, o = document.getElementById(out);
+        if (!y) { o.textContent = ''; o.className = 'match'; return; }
+        const ok = x === y; o.textContent = ok ? '\u2713 Kata sandi cocok' : 'Kata sandi belum sama'; o.className = 'match ' + (ok ? 'ok' : 'no');
+    };
+    document.getElementById(a).addEventListener('input', f); document.getElementById(b).addEventListener('input', f);
+}
+bindMatch('authPw1', 'authPw2', 'pwMatch'); bindMatch('fpPw1', 'fpPw2', 'fpMatch');
+
+// ---- Lupa kata sandi (kode 6 digit lewat email) ----
+function showForgot() {
+    document.getElementById('authMain').style.display = 'none';
+    ['fp2', 'fp3'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+    document.getElementById('fp1').style.display = 'block';
+    document.getElementById('fpErr1').textContent = '';
+    const em = document.getElementById('authEmail').value.trim(); if (em) document.getElementById('fpEmail').value = em;
+}
+async function fpSend(resend) {
+    const email = document.getElementById(resend ? 'fpEmail' : 'fpEmail').value.toLowerCase().trim();
+    const err = document.getElementById(resend ? 'fpErr2' : 'fpErr1'), btn = document.getElementById('fpSendBtn');
+    err.textContent = '';
+    if (!email || email.indexOf('@') < 0) { err.textContent = 'Email tidak valid.'; return; }
+    if (!resend) btn.disabled = true;
+    try {
+        const r = await publicPost({ action: 'forgotPassword', email });
+        if (r.status !== 'success') { err.textContent = r.message || 'Gagal mengirim kode.'; return; }
+        document.getElementById('fpMail').textContent = email;
+        document.getElementById('fp1').style.display = 'none'; document.getElementById('fp2').style.display = 'block';
+        if (resend) showToast('\u2713 Kode dikirim ulang');
+        document.getElementById('fpCode').focus();
+    } catch (e) { err.textContent = 'Error: ' + e.message; }
+    finally { btn.disabled = false; }
+}
+async function fpReset() {
+    const email = document.getElementById('fpEmail').value.toLowerCase().trim();
+    const code = document.getElementById('fpCode').value.trim(), p1 = document.getElementById('fpPw1').value, p2 = document.getElementById('fpPw2').value;
+    const err = document.getElementById('fpErr2'), btn = document.getElementById('fpResetBtn');
+    err.textContent = '';
+    if (!/^\d{6}$/.test(code)) { err.textContent = 'Masukkan kode 6 digit dari email.'; return; }
+    if (p1.length < 8) { err.textContent = 'Kata sandi minimal 8 karakter.'; return; }
+    if (p1 !== p2) { err.textContent = 'Konfirmasi kata sandi tidak cocok.'; return; }
+    btn.disabled = true;
+    try {
+        const r = await publicPost({ action: 'resetPassword', email, code, password: p1 });
+        if (r.status !== 'success') { err.textContent = r.message || 'Gagal.'; return; }
+        document.getElementById('authEmail').value = email;
+        document.getElementById('fp2').style.display = 'none'; document.getElementById('fp3').style.display = 'block';
+    } catch (e) { err.textContent = 'Error: ' + e.message; }
+    finally { btn.disabled = false; }
 }
 function hideAuthModal() {
     document.getElementById('authModal').classList.add('hidden');
@@ -272,11 +334,18 @@ function afterLogin(res) {
     saveSession(res.email, res.token, res.isDev);
     hideAuthModal();
     if (res.isDev) { hideAccess(); loadData(); refreshMe(); }
-    else routeAccess(res.accessStatus, res.hasSheet);
+    else routeAccess(res.accessStatus);
 }
-function routeAccess(st, hasSheet) {
-    if (st === 'Aktif' && hasSheet) { hideAccess(); hideAuthModal(); loadData(); return; }
-    showAccess(st === 'Aktif' ? 'nosheet' : st === 'Ditolak' ? 'rejected' : 'pending');
+async function routeAccess(st) {
+    if (st === 'Aktif') {
+        const first = accessState === 'pending' || accessState === 'preparing' || accessState === 'retry';
+        if (first) showAccess('preparing'); // pertama kali: spreadsheet sedang dibuat
+        hideAuthModal();
+        await loadData(first);
+        if (accessState === 'preparing') showAccess('retry'); // gagal memuat: beri tombol coba lagi
+        return;
+    }
+    showAccess(st === 'Ditolak' ? 'rejected' : 'pending');
 }
 let accessState = '', accessTimer = null;
 function showAccess(state) {
@@ -285,16 +354,17 @@ function showAccess(state) {
     const m = {
         pending:  { ico: '\u23F3', bg: '#3a2f0b', t: 'Menunggu persetujuan', x: 'Permintaan akses sudah dikirim ke developer. Halaman ini otomatis berubah saat disetujui.', pill: 'PENDING', pc: '#f5c542', pb: '#3a2f0b', btn: 'Cek status' },
         rejected: { ico: '\u26D4', bg: '#2a1416', t: 'Akses ditolak', x: 'Developer belum memberi akses untuk email ini. Hubungi developer jika ini keliru.', pill: 'DITOLAK', pc: '#ff6b6b', pb: '#2a1416', btn: 'Cek status' },
-        nosheet:  { ico: '\u2713', bg: '#0e3a22', t: 'Akses disetujui', x: 'Langkah berikutnya: hubungkan Google Drive agar spreadsheet pribadimu dibuat otomatis. Fitur ini sedang disiapkan.', pill: 'AKTIF', pc: '#3ddc84', pb: '#0e3a22', btn: 'Hubungkan Google Drive (segera)' }
+        retry:    { ico: '!', bg: '#3a2f0b', t: 'Belum berhasil', x: 'Spreadsheet belum siap dimuat. Periksa koneksi lalu coba lagi.', pill: 'COBA LAGI', pc: '#f5c542', pb: '#3a2f0b', btn: 'Coba lagi' },
+        preparing: { ico: '\u2713', bg: '#0e3a22', t: 'Akses disetujui', x: 'Menyiapkan spreadsheet pribadimu. Hanya sekali, sekitar 5 detik.', pill: 'MENYIAPKAN', pc: '#3ddc84', pb: '#0e3a22', btn: '' }
     }[state];
     document.getElementById('acIco').innerHTML = m.ico; document.getElementById('acIco').style.background = m.bg;
     document.getElementById('acTitle').textContent = m.t; document.getElementById('acText').textContent = m.x;
     document.getElementById('acWho').textContent = currentUser.email || '';
     const pl = document.getElementById('acPill'); pl.textContent = m.pill; pl.style.color = m.pc; pl.style.background = m.pb;
-    const b = document.getElementById('acMain'); b.textContent = m.btn; b.disabled = state === 'nosheet';
+    const b = document.getElementById('acMain'); b.textContent = m.btn; b.style.display = m.btn ? 'block' : 'none';
     document.getElementById('accessScreen').classList.remove('hidden');
     clearInterval(accessTimer);
-    if (state !== 'nosheet') accessTimer = setInterval(() => { if (document.visibilityState === 'visible') checkAccessNow(true); }, 8000);
+    if (state !== 'preparing' && state !== 'retry') accessTimer = setInterval(() => { if (document.visibilityState === 'visible') checkAccessNow(true); }, 8000);
 }
 function hideAccess() { clearInterval(accessTimer); document.getElementById('accessScreen').classList.add('hidden'); }
 async function checkAccessNow(quiet) {
@@ -303,8 +373,8 @@ async function checkAccessNow(quiet) {
         if (r.code === 'AUTH') { try { localStorage.removeItem(AUTH_KEY); } catch (e) {} showAuthModal('login'); return; }
         if (r.status !== 'success') return;
         if (r.isDev) { saveSession(r.email, currentUser.token, true); hideAccess(); loadData(); return; }
-        if (r.accessStatus === 'Aktif' && r.hasSheet) { routeAccess('Aktif', true); return; }
-        const st = r.accessStatus === 'Aktif' ? 'nosheet' : r.accessStatus === 'Ditolak' ? 'rejected' : 'pending';
+        if (r.accessStatus === 'Aktif') { if (accessState !== 'preparing') routeAccess('Aktif'); return; }
+        const st = r.accessStatus === 'Ditolak' ? 'rejected' : 'pending';
         if (st !== accessState) showAccess(st);
         else if (!quiet) showToast('Status: ' + r.accessStatus);
     } catch (e) { if (!quiet) showToast('Koneksi error: ' + e.message, true); }
@@ -327,9 +397,23 @@ async function refreshMe() {
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshMe(); });
 
 async function doLogout() {
-    if (!confirm('Keluar dari MyBudget?')) return;
-    try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); } catch(e) {}
+    if (!confirm('Keluar dari MyBudget di perangkat ini?')) return;
+    try { await Promise.race([apiPost({ action: 'logout' }), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
+    try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); } catch (e) {}
     location.reload();
+}
+
+async function doDeleteAccount() {
+    if (!confirm('Hapus akun dan SEMUA datamu? Spreadsheet-mu dipindahkan ke Sampah dan tidak bisa dikembalikan dari aplikasi.')) return;
+    const t = prompt('Ketik HAPUS untuk melanjutkan.');
+    if (!t || t.trim().toUpperCase() !== 'HAPUS') { showToast('Dibatalkan'); return; }
+    showSaving('Menghapus akun...');
+    try {
+        const r = await apiPost({ action: 'deleteSelf' });
+        if (r.status !== 'success') throw new Error(r.message || 'Gagal');
+        try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); localStorage.removeItem('mb_emoji'); } catch (e) {}
+        location.reload();
+    } catch (e) { hideSaving(); showToast('Gagal: ' + e.message, true); }
 }
 
 function saveSession(email, token, isDev) {
@@ -372,7 +456,6 @@ async function initAuth() {
         return false;
     }
     currentUser = session;
-    if (!session.isDev) { setLoading(false); checkAccessNow(); return false; }
     refreshMe();
     const cache = loadCache();
     if (cache && cache.email === session.email && cache.result) {
@@ -473,10 +556,11 @@ async function loadData(silent) {
     try {
         const result = await apiGet('getData');
         if (result.status === 'success') {
+            if (accessState) { hideAccess(); accessState = ''; }
             applyData(result);
             saveCache();
-        } else if (result.code === 'PENDING' || result.code === 'REJECTED' || result.code === 'NO_SHEET') {
-            showAccess(result.code === 'PENDING' ? 'pending' : result.code === 'REJECTED' ? 'rejected' : 'nosheet');
+        } else if (result.code === 'PENDING' || result.code === 'REJECTED') {
+            showAccess(result.code === 'PENDING' ? 'pending' : 'rejected');
         } else if (result.code === 'AUTH' || /token|access denied/i.test(result.message || '')) {
             try { localStorage.removeItem(AUTH_KEY); } catch (e) {}
             showAuthModal('login');
@@ -1511,7 +1595,8 @@ function renderSettings() {
         <div class="sh-c"><div class="sh-row" style="cursor:default"><div class="av">${esc(ini)}</div><b style="font-size:15px;word-break:break-all">${esc(em || 'MyBudget')}<br><span class="sv" style="font-size:13px;font-weight:600">Personal account</span></b></div></div>
         <div class="sh-c" style="margin-top:14px">${row('#5b8def', 'fa-building-columns', 'Account Balance', 'Soon', '')}${row('#7b6fe8', 'fa-dollar-sign', 'Currency', 'IDR', '')}${row('#3fb99a', 'fa-tag', 'Categories', '', "sView='cats';renderSettings()")}</div>
         ${currentUser.isDev ? `<div class="sh-c" style="margin-top:14px">${row('#b8860b', 'fa-user-shield', 'Pengguna &amp; Izin', pendingCount ? `<span class="bdg">${pendingCount} baru</span>` : '', "sView='users';openUsers()")}</div>` : ''}
-        <div class="sh-c" style="margin-top:14px">${row('#4a8af4', 'fa-arrows-rotate', 'Refresh Data', '', 'refreshData()')}${row('#e5484d', 'fa-right-from-bracket', 'Logout', '', 'doLogout()', true)}</div>`;
+        <div class="sh-c" style="margin-top:14px">${row('#4a8af4', 'fa-arrows-rotate', 'Refresh Data', '', 'refreshData()')}${row('#e5484d', 'fa-right-from-bracket', 'Keluar', '', 'doLogout()', true)}</div>
+        ${currentUser.isDev ? '' : `<div class="sh-c" style="margin-top:14px">${row('#e5484d', 'fa-user-xmark', 'Hapus akun &amp; data', '', 'doDeleteAccount()', true)}</div>`}`;
 }
 
 // ==============================================
@@ -1535,13 +1620,13 @@ function renderUsers(el) {
     const btns = (u, i) => uTab === 'Pending'
         ? `<button class="ok" onclick="userSet(${i},'Aktif')">Setujui</button><button class="no" onclick="userSet(${i},'Ditolak')">Tolak</button>`
         : uTab === 'Aktif'
-            ? `<button class="no" onclick="userSet(${i},'Ditolak')">Cabut akses</button><button onclick="userDel(${i})">Hapus</button>`
+            ? `${u.sheetUrl ? `<button class="ok" onclick="window.open('${esc(u.sheetUrl)}','_blank','noopener')">Buka sheet</button>` : ''}<button class="no" onclick="userSet(${i},'Ditolak')">Cabut</button><button onclick="userDel(${i})">Hapus</button>`
             : `<button class="ok" onclick="userSet(${i},'Aktif')">Setujui ulang</button><button onclick="userDel(${i})">Hapus</button>`;
     el.innerHTML = `<div class="hh" style="margin-top:6px"><button class="sh-r" ${rb} onclick="sView='main';renderSettings()"><i class="fa-solid fa-chevron-left"></i></button>
         <button class="sh-r" ${rb} onclick="loadUsers()"><i class="fa-solid fa-arrows-rotate"></i></button></div>
         <h2>Pengguna</h2>
         <div class="tabs">${[['Pending', 'Pending'], ['Aktif', 'Aktif'], ['Ditolak', 'Ditolak']].map(t => `<button class="${uTab === t[0] ? 'on' : ''}" onclick="uTab='${t[0]}';renderSettings()">${t[1]} ${cnt(t[0])}</button>`).join('')}</div>
-        ${uBusy && !uList.length ? '<p class="hint">Memuat...</p>' : list.length ? list.map(u => `<div class="ucard"><b>${esc(u.email)}</b><em>${via(u)} · ${esc(uTab === 'Aktif' && u.approvedAt ? 'Disetujui ' + u.approvedAt : u.createdAt)}${u.hasSheet ? ' · Drive terhubung' : ''}</em><div class="ub">${btns(u, u.i)}</div></div>`).join('') : '<p class="hint">Tidak ada pengguna di tab ini.</p>'}
+        ${uBusy && !uList.length ? '<p class="hint">Memuat...</p>' : list.length ? list.map(u => `<div class="ucard"><b>${esc(u.email)}</b><em>${via(u)} · ${esc(uTab === 'Aktif' && u.approvedAt ? 'Disetujui ' + u.approvedAt : u.createdAt)}${u.hasSheet ? ' · Spreadsheet siap' : ''}</em><div class="ub">${btns(u, u.i)}</div></div>`).join('') : '<p class="hint">Tidak ada pengguna di tab ini.</p>'}
         <p class="hint">Mencabut akses langsung mengeluarkan pengguna dari semua perangkat. Notifikasi permintaan baru dikirim ke email developer.</p>`;
 }
 async function userSet(i, st) {
@@ -1556,10 +1641,11 @@ async function userSet(i, st) {
 }
 async function userDel(i) {
     const u0 = uList[i]; if (!u0) return; const email = u0.email;
-    if (!confirm('Hapus pengguna ' + email + '? Spreadsheet di Drive-nya tidak ikut terhapus.')) return;
+    if (!confirm('Hapus pengguna ' + email + '? Akun ini tidak bisa masuk lagi.')) return;
+    const trash = !!u0.hasSheet && confirm('Pindahkan juga spreadsheet-nya ke Sampah Drive?\n\nOK = ya, pindahkan\nBatal = hapus akun saja, spreadsheet dipertahankan');
     const keep = uList.slice(); uList = uList.filter(x => x.email !== email); setPending(uList.filter(x => x.status === 'Pending').length); renderSettings();
     try {
-        const r = await apiPost({ action: 'deleteUser', target: email });
+        const r = await apiPost({ action: 'deleteUser', target: email, trashSheet: trash });
         if (r.status !== 'success') throw new Error(r.message);
         showToast('\u2713 Pengguna dihapus');
     } catch (e) { uList = keep; renderSettings(); showToast('Gagal: ' + e.message, true); }
