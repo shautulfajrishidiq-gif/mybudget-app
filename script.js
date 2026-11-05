@@ -371,10 +371,20 @@ function accessKeyOf(r) {
     if (planInfo(r.plan)) return 'pay:' + r.plan;
     return 'pending';
 }
+function saveAccessCache(r) {
+    try { localStorage.setItem('mb_access', JSON.stringify({ email: currentUser.email, r: { accessStatus: r.accessStatus, plan: r.plan || '', needPlan: !!r.needPlan } })); } catch (e) {}
+}
+function loadAccessCache() {
+    try {
+        const o = JSON.parse(localStorage.getItem('mb_access') || 'null');
+        return o && o.email === currentUser.email ? o.r : null;
+    } catch (e) { return null; }
+}
 function accessFromInfo(r, quiet) {
     const k = accessKeyOf(r);
     if (quiet && k === curAccessKey) return;
     curAccessKey = k;
+    saveAccessCache(r);
     if (k === 'choose') return showPlan('choose');
     if (k.indexOf('pay:') === 0) { selPlan = r.plan; return showPlan('pay'); }
     showAccess(k);
@@ -451,7 +461,7 @@ function showAccess(state) {
     clearInterval(accessTimer);
     if (state !== 'preparing' && state !== 'retry') accessTimer = setInterval(() => { if (document.visibilityState === 'visible') checkAccessNow(true); }, 8000);
 }
-function hideAccess() { clearInterval(accessTimer); curAccessKey = ''; document.getElementById('accessScreen').classList.add('hidden'); document.getElementById('planScreen').classList.add('hidden'); }
+function hideAccess() { clearInterval(accessTimer); curAccessKey = ''; try { localStorage.removeItem('mb_access'); } catch (e) {} document.getElementById('accessScreen').classList.add('hidden'); document.getElementById('planScreen').classList.add('hidden'); }
 async function checkAccessNow(quiet) {
     try {
         const r = await apiGet('me');
@@ -483,7 +493,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 async function doLogout() {
     if (!confirm('Keluar dari Ngatur Duit di perangkat ini?')) return;
     try { await Promise.race([apiPost({ action: 'logout' }), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
-    try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); localStorage.removeItem('mb_profile'); } catch (e) {}
+    try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); localStorage.removeItem('mb_profile'); localStorage.removeItem('mb_access'); } catch (e) {}
     location.reload();
 }
 
@@ -495,7 +505,7 @@ async function doDeleteAccount() {
     try {
         const r = await apiPost({ action: 'deleteSelf' });
         if (r.status !== 'success') throw new Error(r.message || 'Gagal');
-        try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); localStorage.removeItem('mb_emoji'); localStorage.removeItem('mb_profile'); } catch (e) {}
+        try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); localStorage.removeItem('mb_emoji'); localStorage.removeItem('mb_profile'); localStorage.removeItem('mb_access'); } catch (e) {}
         location.reload();
     } catch (e) { hideSaving(); showToast('Gagal: ' + e.message, true); }
 }
@@ -549,6 +559,8 @@ async function initAuth() {
         loadData(true);                   // segarkan di belakang layar (1x panggilan)
         return false;                     // startup tidak perlu memuat ulang
     }
+    const sa = loadAccessCache();         // akun yang belum aktif: langsung tampilkan layar paket/pembayaran, tanpa sempat melihat isi app
+    if (sa && sa.accessStatus !== 'Aktif') accessFromInfo(sa);
     return true;                          // belum ada cache: startup memanggil loadData() satu kali
 }
 
@@ -636,7 +648,7 @@ function renderLocal() {
 }
 
 async function loadData(silent) {
-    if (!silent) setLoading(true);
+    if (!silent && !accessState) setLoading(true);
     try {
         const result = await apiGet('getData');
         if (result.status === 'success') {
@@ -644,7 +656,8 @@ async function loadData(silent) {
             applyData(result);
             saveCache();
         } else if (['PENDING', 'REJECTED', 'NEED_PLAN', 'EXPIRED'].indexOf(result.code) >= 0) {
-            checkAccessNow(true);
+            if (result.accessStatus !== undefined) accessFromInfo(result, true);   // server baru: info sudah ikut di jawaban
+            else await checkAccessNow(true);                                       // server lama: tanya status dulu
         } else if (result.code === 'AUTH' || /token|access denied/i.test(result.message || '')) {
             try { localStorage.removeItem(AUTH_KEY); } catch (e) {}
             showAuthModal('login');
