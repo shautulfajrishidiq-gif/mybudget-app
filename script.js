@@ -338,7 +338,7 @@ function afterLogin(res) {
     if (res.isDev) { hideAccess(); loadData(); refreshMe(); }
     else routeAccess(res.accessStatus, res);
 }
-async function routeAccess(st) {
+async function routeAccess(st, info) {
     if (st === 'Aktif') {
         const first = accessState === 'pending' || accessState === 'preparing' || accessState === 'retry';
         if (first) showAccess('preparing'); // pertama kali: spreadsheet sedang dibuat
