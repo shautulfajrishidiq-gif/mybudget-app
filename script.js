@@ -1586,6 +1586,11 @@ function curCats() {
     const [y, m] = cMonth.split('-').map(Number), s = kategoriForPeriod(m, y) || {};
     return { Income: (s.Income || []).slice(), Expenses: (s.Expenses || []).slice(), Savings: (s.Savings || []).slice() };
 }
+function themeCardHtml() {
+    const t = (window.getTheme && getTheme()) || 'dark';
+    const b = (k, ic, l) => `<button class="${t === k ? 'on' : ''}" onclick="setTheme('${k}');renderSettings()"><i class="fa-solid ${ic}"></i>${l}</button>`;
+    return `<div class="sh-c" style="margin-top:14px"><div class="sh-row" style="cursor:default;border-bottom:none;padding-bottom:0"><span class="ic" style="background:#5856d6"><i class="fa-solid fa-circle-half-stroke"></i></span><b>Appearance</b></div><div class="seg">${b('dark', 'fa-moon', 'Dark')}${b('light', 'fa-sun', 'Light')}</div></div>`;
+}
 function renderSettings() {
     const el = document.getElementById('set'); if (!el) return;
     if (sView === 'cats') return renderCats(el);
@@ -1595,6 +1600,7 @@ function renderSettings() {
     el.innerHTML = `<h2 style="margin-top:16px">Settings</h2>
         <div class="sh-c"><div class="sh-row" style="cursor:default"><div class="av">${esc(ini)}</div><b style="font-size:15px;word-break:break-all">${esc(em || 'Ngatur Duit')}<br><span class="sv" style="font-size:13px;font-weight:600">Personal account</span></b></div></div>
         <div class="sh-c" style="margin-top:14px">${row('#5b8def', 'fa-building-columns', 'Account Balance', 'Soon', '')}${row('#7b6fe8', 'fa-dollar-sign', 'Currency', 'IDR', '')}${row('#3fb99a', 'fa-tag', 'Categories', '', "sView='cats';renderSettings()")}</div>
+        ${themeCardHtml()}
         ${currentUser.isDev ? `<div class="sh-c" style="margin-top:14px">${row('#b8860b', 'fa-user-shield', 'Pengguna &amp; Izin', pendingCount ? `<span class="bdg">${pendingCount} baru</span>` : '', "sView='users';openUsers()")}</div>` : ''}
         <div class="sh-c" style="margin-top:14px">${row('#4a8af4', 'fa-arrows-rotate', 'Refresh Data', '', 'refreshData()')}${row('#e5484d', 'fa-right-from-bracket', 'Keluar', '', 'doLogout()', true)}</div>
         ${currentUser.isDev ? '' : `<div class="sh-c" style="margin-top:14px">${row('#e5484d', 'fa-user-xmark', 'Hapus akun &amp; data', '', 'doDeleteAccount()', true)}</div>`}`;
