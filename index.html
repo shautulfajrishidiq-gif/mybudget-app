@@ -487,9 +487,45 @@
         .ucard .ub { display:flex; gap:8px; margin-top:10px; }
         .ucard .ub button { flex:1; border:none; border-radius:12px; padding:10px; font-weight:700; font-size:13px; cursor:pointer; background:var(--card2); color:#fff; }
         .ucard .ub .ok { background:var(--blue); } .ucard .ub .no { background:#2a1416; color:#ff6b6b; }
+
+        /* ===== Splash screen (opsi B: biru penuh) ===== */
+        #splash { position:fixed; inset:0; z-index:5000; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; background:linear-gradient(165deg,#2f6df0 0%,#1e40af 100%); font-family:'Inter',-apple-system,system-ui,sans-serif; transition:opacity .45s ease; }
+        #splash.hide { opacity:0; pointer-events:none; }
+        #splash .sp-c1, #splash .sp-c2 { position:absolute; border-radius:50%; background:rgba(255,255,255,.07); }
+        #splash .sp-c1 { top:-120px; right:-140px; width:360px; height:360px; }
+        #splash .sp-c2 { bottom:-160px; left:-120px; width:380px; height:380px; background:rgba(255,255,255,.06); }
+        #splash svg { position:relative; width:180px; height:180px; }
+        #splash .sp-b { transform-box:fill-box; transform-origin:50% 100%; }
+        #splash.go .sp-b { animation:spBar .6s cubic-bezier(.2,.9,.3,1.1) both; }
+        #splash.go .sp-b2 { animation-delay:.12s; }
+        #splash.go .sp-b3 { animation-delay:.24s; }
+        #splash .sp-l { stroke-dasharray:620; stroke-dashoffset:0; }
+        #splash.go .sp-l { animation:spLine .7s ease .45s both; }
+        #splash h1 { position:relative; margin:24px 0 0; font-size:34px; font-weight:800; letter-spacing:-.6px; color:#fff; }
+        #splash p { position:relative; margin:8px 0 0; font-size:15px; font-weight:600; color:#fff; }
+        #splash .sp-cp { position:absolute; bottom:calc(48px + env(safe-area-inset-bottom)); left:0; right:0; margin:0; text-align:center; font-size:12px; }
+        #splash.go h1, #splash.go p { animation:spUp .55s ease .35s both; }
+        @keyframes spBar { from { transform:scaleY(0); opacity:0; } to { transform:scaleY(1); opacity:1; } }
+        @keyframes spLine { from { stroke-dashoffset:620; opacity:0; } 15% { opacity:1; } to { stroke-dashoffset:0; opacity:1; } }
+        @keyframes spUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+        @media (prefers-reduced-motion: reduce) { #splash.go .sp-b, #splash.go .sp-l, #splash.go h1, #splash.go p { animation:none; } }
     </style>
 </head>
 <body>
+
+<!-- ========== SPLASH SCREEN ========== -->
+<div id="splash" class="go" role="img" aria-label="Ngatur Duit">
+    <div class="sp-c1"></div><div class="sp-c2"></div>
+    <svg viewBox="90 70 340 340" aria-hidden="true">
+        <rect class="sp-b sp-b1" x="110" y="291" width="67" height="99" rx="20" fill="#ffffff" fill-opacity="0.55"></rect>
+        <rect class="sp-b sp-b2" x="222" y="226" width="67" height="164" rx="20" fill="#ffffff" fill-opacity="0.82"></rect>
+        <rect class="sp-b sp-b3" x="335" y="150" width="67" height="240" rx="20" fill="#ffffff"></rect>
+        <polyline class="sp-l" points="118,236 228,163 287,197 374,95" fill="none" stroke="#fbbf24" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"></polyline>
+    </svg>
+    <h1>Ngatur Duit</h1>
+    <p>Finance Tracker</p>
+    <p class="sp-cp">&copy; 2026 Ngatur Duit</p>
+</div>
 
 <!-- ========== AUTH MODAL ========== -->
 <div id="authModal" class="hidden">
@@ -981,6 +1017,29 @@ window.addEventListener('resize', applyLayout);
 </script>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="script.js?v=20261105b"></script>
+<script>
+// Splash screen: tampil saat aplikasi dibuka dan setelah login
+(function () {
+    var el = document.getElementById('splash'), t1, t2;
+    function hide() {
+        if (!el) return;
+        el.classList.add('hide');
+        clearTimeout(t2);
+        t2 = setTimeout(function () { el.style.display = 'none'; }, 480);
+    }
+    window.hideSplash = hide;
+    window.showSplash = function (ms) {
+        if (!el) return;
+        clearTimeout(t1); clearTimeout(t2);
+        el.style.display = 'flex';
+        el.classList.remove('hide', 'go');
+        void el.offsetWidth;
+        el.classList.add('go');
+        t1 = setTimeout(hide, ms || 1700);
+    };
+    t1 = setTimeout(hide, 1700);
+})();
+</script>
+<script src="script.js?v=20261105c"></script>
 </body>
 </html>
