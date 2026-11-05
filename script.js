@@ -332,6 +332,7 @@ async function onGoogleCred(resp) {
 // ---- Routing akses: Masuk -> Menunggu izin -> Hubungkan Drive -> pakai ----
 function afterLogin(res) {
     saveSession(res.email, res.token, res.isDev);
+    try { if (window.showSplash) showSplash(1400); } catch (e) {}
     hideAuthModal();
     if (res.isDev) { hideAccess(); loadData(); refreshMe(); }
     else routeAccess(res.accessStatus);
