@@ -334,6 +334,7 @@ function afterLogin(res) {
     saveSession(res.email, res.token, res.isDev);
     try { if (window.showSplash) showSplash(1400); } catch (e) {}
     hideAuthModal();
+    loadProfileCache(); fetchProfile();
     if (res.isDev) { hideAccess(); loadData(); refreshMe(); }
     else routeAccess(res.accessStatus);
 }
@@ -400,7 +401,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 async function doLogout() {
     if (!confirm('Keluar dari Ngatur Duit di perangkat ini?')) return;
     try { await Promise.race([apiPost({ action: 'logout' }), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
-    try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); } catch (e) {}
+    try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); localStorage.removeItem('mb_profile'); } catch (e) {}
     location.reload();
 }
 
@@ -412,7 +413,7 @@ async function doDeleteAccount() {
     try {
         const r = await apiPost({ action: 'deleteSelf' });
         if (r.status !== 'success') throw new Error(r.message || 'Gagal');
-        try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); localStorage.removeItem('mb_emoji'); } catch (e) {}
+        try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); localStorage.removeItem('mb_emoji'); localStorage.removeItem('mb_profile'); } catch (e) {}
         location.reload();
     } catch (e) { hideSaving(); showToast('Gagal: ' + e.message, true); }
 }
@@ -457,7 +458,7 @@ async function initAuth() {
         return false;
     }
     currentUser = session;
-    refreshMe();
+    refreshMe(); loadProfileCache(); fetchProfile();
     const cache = loadCache();
     if (cache && cache.email === session.email && cache.result) {
         applyData(cache.result);          // tampil langsung dari data terakhir
@@ -1667,15 +1668,156 @@ function renderSettings() {
     const el = document.getElementById('set'); if (!el) return;
     if (sView === 'cats') return renderCats(el);
     if (sView === 'users') return renderUsers(el);
-    const em = (currentUser && currentUser.email) || '', ini = (em.slice(0, 2) || 'MB').toUpperCase();
-    const row = (bg, ic, t, v, on, red) => `<div class="sh-row" onclick="${on}"><span class="ic" style="background:${bg}"><i class="fa-solid ${ic}"></i></span><b style="${red ? 'color:#ff5a5f' : ''}">${t}</b>${v ? `<span class="sv">${v}</span>` : ''}${on && !red ? '<i class="fa-solid fa-chevron-right" style="color:#636366;font-size:13px"></i>' : ''}</div>`;
+    if (sView === 'profile') return renderProfileEdit(el);
+    const em = (currentUser && currentUser.email) || '';
+    const row = (bg, ic, t, v, on, red) => `<div class="sh-row" ${on ? `onclick="${on}"` : 'style="cursor:default"'}><span class="ic" style="background:${bg}"><i class="fa-solid ${ic}"></i></span><b style="${red ? 'color:#ff5a5f' : ''}">${t}</b>${v ? `<span class="sv">${v}</span>` : ''}${on && !red ? '<i class="fa-solid fa-chevron-right" style="color:#636366;font-size:13px"></i>' : ''}</div>`;
+    const lb = t => `<div class="sh-l" style="font-size:12px;font-weight:700;letter-spacing:.04em;color:#8e8e93;margin:18px 6px 6px">${t}</div>`;
     el.innerHTML = `<h2 style="margin-top:16px">Settings</h2>
-        <div class="sh-c"><div class="sh-row" style="cursor:default"><div class="av">${esc(ini)}</div><b style="font-size:15px;word-break:break-all">${esc(em || 'Ngatur Duit')}<br><span class="sv" style="font-size:13px;font-weight:600">Personal account</span></b></div></div>
-        <div class="sh-c" style="margin-top:14px">${row('#5b8def', 'fa-building-columns', 'Account Balance', 'Soon', '')}${row('#7b6fe8', 'fa-dollar-sign', 'Currency', 'IDR', '')}${row('#3fb99a', 'fa-tag', 'Categories', '', "sView='cats';renderSettings()")}</div>
+        <div class="sh-c"><div class="sh-row" style="border-bottom:none" onclick="openProfile()"><div class="av">${avatarInner()}</div><b style="font-size:17px;min-width:0"><span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(profileTitle())}</span><span class="sv" style="display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(em)}</span></b><i class="fa-solid fa-chevron-right" style="color:#636366;font-size:13px"></i></div></div>
+        ${lb('PREFERENSI')}
+        <div class="sh-c">${row('#3fb99a', 'fa-tag', 'Categories', '', "sView='cats';renderSettings()")}${row('#7b6fe8', 'fa-dollar-sign', 'Currency', 'IDR', '')}</div>
         ${themeCardHtml()}
-        ${currentUser.isDev ? `<div class="sh-c" style="margin-top:14px">${row('#b8860b', 'fa-user-shield', 'Pengguna &amp; Izin', pendingCount ? `<span class="bdg">${pendingCount} baru</span>` : '', "sView='users';openUsers()")}</div>` : ''}
-        <div class="sh-c" style="margin-top:14px">${row('#4a8af4', 'fa-arrows-rotate', 'Refresh Data', '', 'refreshData()')}${row('#e5484d', 'fa-right-from-bracket', 'Keluar', '', 'doLogout()', true)}</div>
-        ${currentUser.isDev ? '' : `<div class="sh-c" style="margin-top:14px">${row('#e5484d', 'fa-user-xmark', 'Hapus akun &amp; data', '', 'doDeleteAccount()', true)}</div>`}`;
+        ${lb('DATA &amp; KEAMANAN')}
+        <div class="sh-c">${row('#0ea5e9', 'fa-file-arrow-down', 'Export data (CSV)', '', 'exportCsv()')}${row('#64748b', 'fa-lock', 'Ganti kata sandi', '', 'openPw()')}${currentUser.isDev ? row('#b8860b', 'fa-user-shield', 'Pengguna &amp; Izin', pendingCount ? `<span class="bdg">${pendingCount} baru</span>` : '', "sView='users';openUsers()") : ''}</div>
+        ${lb('AKUN')}
+        <div class="sh-c">${row('#e5484d', 'fa-right-from-bracket', 'Keluar', '', 'doLogout()', true)}${currentUser.isDev ? '' : row('#e5484d', 'fa-user-xmark', 'Hapus akun &amp; data', '', 'doDeleteAccount()', true)}</div>`;
+}
+
+// ==============================================
+// PROFIL (nama + foto), GANTI KATA SANDI, EXPORT CSV
+// ==============================================
+let profile = { name: '', photo: '' }, pfDraft = null;
+function loadProfileCache() {
+    try {
+        const o = JSON.parse(localStorage.getItem('mb_profile') || 'null');
+        if (o && o.email === currentUser.email) profile = { name: o.name || '', photo: o.photo || '' };
+    } catch (e) {}
+}
+function saveProfileCache() {
+    try { localStorage.setItem('mb_profile', JSON.stringify({ email: currentUser.email, name: profile.name, photo: profile.photo })); } catch (e) {}
+}
+async function fetchProfile() {
+    try {
+        const r = await apiGet('getProfile');
+        if (r.status !== 'success' || pfDirty) return;
+        profile = { name: r.name || '', photo: r.photo || '' };
+        saveProfileCache();
+        if (sView === 'main') renderSettings();
+    } catch (e) {}
+}
+let pfDirty = false;
+function profileTitle() {
+    if (profile.name) return profile.name;
+    const em = (currentUser && currentUser.email) || '';
+    return em.split('@')[0] || 'Ngatur Duit';
+}
+function avatarInner(photo) {
+    const p = photo === undefined ? profile.photo : photo;
+    if (p) return `<img src="${esc(p)}" alt="">`;
+    return esc((((currentUser && currentUser.email) || 'MB').slice(0, 2)).toUpperCase());
+}
+function openProfile() {
+    pfDraft = { name: profile.name, photo: profile.photo, photoChanged: false };
+    sView = 'profile'; renderSettings();
+}
+function renderProfileEdit(el) {
+    if (!pfDraft) pfDraft = { name: profile.name, photo: profile.photo, photoChanged: false };
+    const em = (currentUser && currentUser.email) || '';
+    el.innerHTML = `<div class="hh" style="margin-top:6px;justify-content:space-between"><button class="sh-r x" onclick="sView='main';pfDraft=null;renderSettings()"><i class="fa-solid fa-xmark"></i></button><h2 style="margin:0;font-size:18px !important">Edit Profile</h2><button class="sh-r go" id="pfGo" onclick="saveProfileEdit()"><i class="fa-solid fa-check"></i></button></div>
+        <div style="display:flex;justify-content:center;margin-top:24px"><div class="pf-big"><div class="av" id="pfAv">${avatarInner(pfDraft.photo)}</div><span class="pf-cam"><i class="fa-solid fa-camera"></i></span></div></div>
+        <div class="pf-acts"><button class="pf-act" onclick="document.getElementById('pfCam').click()"><i class="fa-solid fa-camera"></i>Kamera</button><button class="pf-act" onclick="document.getElementById('pfGal').click()"><i class="fa-regular fa-image"></i>Galeri</button>${pfDraft.photo ? '<button class="pf-act red" onclick="removePfPhoto()"><i class="fa-regular fa-trash-can"></i>Hapus foto</button>' : ''}</div>
+        <div class="sh-l" style="font-size:13px;font-weight:700;color:#8e8e93;margin:22px 6px 8px">Profil</div>
+        <div class="sh-c"><label class="sh-row"><b>Nama</b><input class="pfi" id="pfName" maxlength="40" placeholder="Nama kamu" autocomplete="off" value="${esc(pfDraft.name)}"></label>
+        <div class="sh-row" style="cursor:default"><b>Email</b><span class="sv" style="font-size:14px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(em)}</span></div>
+        <div class="sh-row" onclick="openPw()"><b>Ganti kata sandi</b><i class="fa-solid fa-chevron-right" style="color:#636366;font-size:13px"></i></div></div>
+        <p class="hint">Foto dikecilkan otomatis dan disimpan di akunmu, jadi ikut tampil di perangkat lain. Email tidak bisa diubah.</p>`;
+    const n = document.getElementById('pfName');
+    if (n) n.addEventListener('input', () => { pfDraft.name = n.value; });
+}
+function resizeImage(file) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file), img = new Image();
+        img.onload = () => {
+            try {
+                const s = Math.min(img.naturalWidth, img.naturalHeight), sx = (img.naturalWidth - s) / 2, sy = (img.naturalHeight - s) / 2;
+                for (const [px, q] of [[256, .82], [256, .7], [192, .7], [160, .6]]) {
+                    const c = document.createElement('canvas'); c.width = c.height = px;
+                    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, px, px);
+                    x.drawImage(img, sx, sy, s, s, 0, 0, px, px);
+                    const d = c.toDataURL('image/jpeg', q);
+                    if (d.length <= 44000) { URL.revokeObjectURL(url); return resolve(d); }
+                }
+                URL.revokeObjectURL(url); reject(new Error('Foto terlalu besar'));
+            } catch (e) { reject(e); }
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('File bukan gambar yang valid')); };
+        img.src = url;
+    });
+}
+async function pickPfFile(inp) {
+    const f = inp.files && inp.files[0]; inp.value = '';
+    if (!f || !pfDraft) return;
+    try {
+        pfDraft.photo = await resizeImage(f); pfDraft.photoChanged = true;
+        const keep = pfDraft.name; renderSettings(); pfDraft.name = keep;
+    } catch (e) { showToast(e.message || 'Gagal memproses foto', true); }
+}
+function removePfPhoto() {
+    if (!pfDraft) return;
+    pfDraft.photo = ''; pfDraft.photoChanged = true; renderSettings();
+}
+function saveProfileEdit() {
+    if (!pfDraft) return;
+    const nEl = document.getElementById('pfName');
+    const name = (nEl ? nEl.value : pfDraft.name).replace(/\s+/g, ' ').trim().slice(0, 40);
+    const payload = { action: 'saveProfile', name };
+    if (pfDraft.photoChanged) payload.photo = pfDraft.photo;
+    profile = { name, photo: pfDraft.photo };
+    saveProfileCache(); pfDraft = null; sView = 'main'; renderSettings();
+    pfDirty = true;
+    syncEnqueue({ run: async () => {
+        try {
+            return await apiPost(payload);
+        } finally { pfDirty = false; }
+    } });
+}
+
+function openPw() {
+    ['pw0', 'pw1', 'pw2'].forEach(i => { const e = document.getElementById(i); if (e) e.value = ''; });
+    document.getElementById('pwSheet').classList.add('open');
+}
+function closePw() { document.getElementById('pwSheet').classList.remove('open'); }
+async function submitPw() {
+    const o = document.getElementById('pw0').value, n = document.getElementById('pw1').value, n2 = document.getElementById('pw2').value;
+    if (!o) { flagField('pw0'); return showToast('Isi kata sandi lama', true); }
+    if (n.length < 8) { flagField('pw1'); return showToast('Kata sandi baru minimal 8 karakter', true); }
+    if (n !== n2) { flagField('pw2'); return showToast('Konfirmasi kata sandi tidak sama', true); }
+    if (n === o) { flagField('pw1'); return showToast('Kata sandi baru harus berbeda', true); }
+    btnBusy('pwGo', true);
+    try {
+        const r = await apiPost({ action: 'changePassword', oldPassword: o, newPassword: n });
+        if (r.status !== 'success') throw new Error(r.message || 'Gagal');
+        closePw(); showToast('Kata sandi diperbarui');
+    } catch (e) { showToast(e.message || 'Gagal', true); }
+    finally { btnBusy('pwGo', false); }
+}
+
+function exportCsv() {
+    const list = (dataTransaksi || []).slice().sort((a, b) => parseTanggal(a.Tanggal) - parseTanggal(b.Tanggal));
+    if (!list.length) { showToast('Belum ada transaksi untuk diexport', true); return; }
+    const q = v => {
+        let s = String(v == null ? '' : v).replace(/\r?\n/g, ' ');
+        if (/^[=+\-@\t]/.test(s)) s = "'" + s;
+        return '"' + s.replace(/"/g, '""') + '"';
+    };
+    const lines = [['Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Deskripsi'].map(q).join(';')];
+    list.forEach(t => lines.push([ymd(t.Tanggal), t.Jenis, t.Kategori, Number(t.Nominal) || 0, t.Deskripsi].map((v, i) => i === 3 ? String(v) : q(v)).join(';')));
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'ngatur-duit-' + ymd(new Date()) + '.csv';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    showToast('Export ' + list.length + ' transaksi');
 }
 
 // ==============================================
