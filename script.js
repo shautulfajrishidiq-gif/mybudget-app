@@ -1724,12 +1724,11 @@ function renderProfileEdit(el) {
     if (!pfDraft) pfDraft = { name: profile.name, photo: profile.photo, photoChanged: false };
     const em = (currentUser && currentUser.email) || '';
     el.innerHTML = `<div class="hh" style="margin-top:6px;justify-content:space-between"><button class="sh-r x" onclick="sView='main';pfDraft=null;renderSettings()"><i class="fa-solid fa-xmark"></i></button><h2 style="margin:0;font-size:18px !important">Edit Profile</h2><button class="sh-r go" id="pfGo" onclick="saveProfileEdit()"><i class="fa-solid fa-check"></i></button></div>
-        <div style="display:flex;justify-content:center;margin-top:24px"><div class="pf-big"><div class="av" id="pfAv">${avatarInner(pfDraft.photo)}</div><span class="pf-cam"><i class="fa-solid fa-camera"></i></span></div></div>
-        <div class="pf-acts"><button class="pf-act" onclick="document.getElementById('pfCam').click()"><i class="fa-solid fa-camera"></i>Kamera</button><button class="pf-act" onclick="document.getElementById('pfGal').click()"><i class="fa-regular fa-image"></i>Galeri</button>${pfDraft.photo ? '<button class="pf-act red" onclick="removePfPhoto()"><i class="fa-regular fa-trash-can"></i>Hapus foto</button>' : ''}</div>
+        <div style="display:flex;justify-content:center;margin-top:24px"><div class="pf-big" onclick="document.getElementById('pfGal').click()" role="button" aria-label="Ganti foto profil" style="cursor:pointer"><div class="av" id="pfAv">${avatarInner(pfDraft.photo)}</div><span class="pf-cam"><i class="fa-solid fa-camera"></i></span></div></div>
+        ${pfDraft.photo ? '<div style="text-align:center;margin-top:14px"><button onclick="removePfPhoto()" style="background:none;border:none;color:#ff5a5f;font-weight:700;font-size:14px;padding:6px 12px">Hapus foto</button></div>' : ''}
         <div class="sh-l" style="font-size:13px;font-weight:700;color:#8e8e93;margin:22px 6px 8px">Profil</div>
         <div class="sh-c"><label class="sh-row"><b>Nama</b><input class="pfi" id="pfName" maxlength="40" placeholder="Nama kamu" autocomplete="off" value="${esc(pfDraft.name)}"></label>
-        <div class="sh-row" style="cursor:default"><b>Email</b><span class="sv" style="font-size:14px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(em)}</span></div>
-        <div class="sh-row" onclick="openPw()"><b>Ganti kata sandi</b><i class="fa-solid fa-chevron-right" style="color:#636366;font-size:13px"></i></div></div>
+        <div class="sh-row" style="cursor:default"><b>Email</b><span class="sv" style="font-size:14px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(em)}</span></div></div>
         <p class="hint">Foto dikecilkan otomatis dan disimpan di akunmu, jadi ikut tampil di perangkat lain. Email tidak bisa diubah.</p>`;
     const n = document.getElementById('pfName');
     if (n) n.addEventListener('input', () => { pfDraft.name = n.value; });
