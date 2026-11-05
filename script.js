@@ -1,5 +1,5 @@
 // ==============================================
-// MyBudget - Frontend JS (for Vercel)
+// Ngatur Duit - Frontend JS (for Vercel)
 // ==============================================
 
 const API_URL = "https://script.google.com/macros/s/AKfycbx7GrPn3k5UL3buJqwim7fh1RsNeMEAb0ymSDhhBsKJXIKSdWGoAhANbp_lZJ657a2t/exec";
@@ -397,7 +397,7 @@ async function refreshMe() {
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshMe(); });
 
 async function doLogout() {
-    if (!confirm('Keluar dari MyBudget di perangkat ini?')) return;
+    if (!confirm('Keluar dari Ngatur Duit di perangkat ini?')) return;
     try { await Promise.race([apiPost({ action: 'logout' }), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
     try { localStorage.removeItem(AUTH_KEY); localStorage.removeItem(CACHE_KEY); } catch (e) {}
     location.reload();
@@ -1592,7 +1592,7 @@ function renderSettings() {
     const em = (currentUser && currentUser.email) || '', ini = (em.slice(0, 2) || 'MB').toUpperCase();
     const row = (bg, ic, t, v, on, red) => `<div class="sh-row" onclick="${on}"><span class="ic" style="background:${bg}"><i class="fa-solid ${ic}"></i></span><b style="${red ? 'color:#ff5a5f' : ''}">${t}</b>${v ? `<span class="sv">${v}</span>` : ''}${on && !red ? '<i class="fa-solid fa-chevron-right" style="color:#636366;font-size:13px"></i>' : ''}</div>`;
     el.innerHTML = `<h2 style="margin-top:16px">Settings</h2>
-        <div class="sh-c"><div class="sh-row" style="cursor:default"><div class="av">${esc(ini)}</div><b style="font-size:15px;word-break:break-all">${esc(em || 'MyBudget')}<br><span class="sv" style="font-size:13px;font-weight:600">Personal account</span></b></div></div>
+        <div class="sh-c"><div class="sh-row" style="cursor:default"><div class="av">${esc(ini)}</div><b style="font-size:15px;word-break:break-all">${esc(em || 'Ngatur Duit')}<br><span class="sv" style="font-size:13px;font-weight:600">Personal account</span></b></div></div>
         <div class="sh-c" style="margin-top:14px">${row('#5b8def', 'fa-building-columns', 'Account Balance', 'Soon', '')}${row('#7b6fe8', 'fa-dollar-sign', 'Currency', 'IDR', '')}${row('#3fb99a', 'fa-tag', 'Categories', '', "sView='cats';renderSettings()")}</div>
         ${currentUser.isDev ? `<div class="sh-c" style="margin-top:14px">${row('#b8860b', 'fa-user-shield', 'Pengguna &amp; Izin', pendingCount ? `<span class="bdg">${pendingCount} baru</span>` : '', "sView='users';openUsers()")}</div>` : ''}
         <div class="sh-c" style="margin-top:14px">${row('#4a8af4', 'fa-arrows-rotate', 'Refresh Data', '', 'refreshData()')}${row('#e5484d', 'fa-right-from-bracket', 'Keluar', '', 'doLogout()', true)}</div>
